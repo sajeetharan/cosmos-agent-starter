@@ -8,6 +8,7 @@ export type CliCommand =
   | "bootstrap"
   | "list"
   | "doctor"
+  | "prepare-azure"
   | "validate"
   | "help"
   | "version";
@@ -88,7 +89,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     wizard
       ? "create"
       : first === "create" || first === "bootstrap" || first === "doctor" ||
-          first === "validate" || first === "list"
+          first === "prepare-azure" || first === "validate" || first === "list"
       ? first
       : undefined;
   const commandOffset = explicitCommand ? 1 : 0;
@@ -190,7 +191,11 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         break;
       default:
         if (argument.startsWith("-")) break;
-        if (explicitCommand === "doctor" || explicitCommand === "validate") {
+        if (
+          explicitCommand === "doctor" ||
+          explicitCommand === "prepare-azure" ||
+          explicitCommand === "validate"
+        ) {
           if (projectDirectory !== ".") {
             throw new Error(`Only one project directory can be specified for ${explicitCommand}.`);
           }
@@ -260,17 +265,26 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     "--environment",
     "-e",
   ];
-  if (command !== "bootstrap" && bootstrapOnlyFlags.some((flag) => args.includes(flag))) {
+  const invalidBootstrapFlags = bootstrapOnlyFlags.filter((flag) =>
+    !(
+      command === "prepare-azure" &&
+      ["--environment", "-e"].includes(flag)
+    )
+  );
+  if (
+    command !== "bootstrap" &&
+    invalidBootstrapFlags.some((flag) => args.includes(flag))
+  ) {
     throw new Error("Install, link, environment, and deploy options are only valid with bootstrap.");
   }
   if (deploy && !linkProject) {
     throw new Error("--deploy cannot be combined with --no-link.");
   }
-  if (environmentName && !linkProject) {
+  if (command === "bootstrap" && environmentName && !linkProject) {
     throw new Error("--environment cannot be combined with --no-link.");
   }
   if (command === "list" && projectDirectory !== ".") {
-    throw new Error("--project is only valid with doctor or validate.");
+    throw new Error("--project is only valid with doctor, prepare-azure, or validate.");
   }
   if (json && scaffoldingCommand && !yes && !dryRun) {
     throw new Error("JSON scaffolding must be noninteractive. Add --yes or use --dry-run.");

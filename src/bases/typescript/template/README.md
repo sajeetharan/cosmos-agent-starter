@@ -14,18 +14,34 @@ npm run dev
 ```
 
 Development defaults to the in-memory adapter, so the API starts without Docker or Azure.
-To use the emulator, run `docker compose up -d`, set `MEMORY_BACKEND=cosmos` and the emulator
-credentials in `.env`, run `npm run emulator:init`, then restart the API.
+To use the emulator, set `MEMORY_BACKEND=cosmos` and the documented emulator credentials in `.env`,
+then run:
 
-The API expects trusted development headers `x-tenant-id` and `x-user-id`. Replace this development
-adapter with verified Entra token claims before deployment. Never accept identity fields from agent tools.
+```powershell
+docker compose up -d
+npm run emulator:init
+npm run dev
+```
+
+The API expects trusted development headers `x-tenant-id` and `x-user-id` only in local mode.
+Production rejects that adapter and validates Microsoft Entra signature, issuer, audience, tenant,
+expiry, and user claims. Never accept identity fields from agent tools.
 
 ## Azure deployment
 
-Run `azd auth login`, set `AZURE_PRINCIPAL_ID` to the deployment identity object ID when it needs
-data-plane access, and run `azd up`. Runtime uses a separate user-assigned Managed Identity and
-`DefaultAzureCredential`; local-auth is disabled on the account. Serverless and autoscale are mutually
-exclusive infrastructure paths.
+Run `azd auth login`, create and configure an `azd` environment, then run:
+
+```powershell
+npx create-cosmos-agent prepare-azure . --environment <environment-name>
+azd up --environment <environment-name>
+```
+
+The readiness command checks required Entra and model values before provisioning. Set
+`AZURE_PRINCIPAL_ID` to the deployment identity object ID only when it needs data-plane access.
+Runtime uses a separate user-assigned Managed Identity and `DefaultAzureCredential`; local-auth is
+disabled on the account. Serverless and autoscale are mutually exclusive infrastructure paths.
+Azure OpenAI capacity is not provisioned by this starter, so confirm deployment quota and grant the
+runtime identity `Cognitive Services OpenAI User` on the configured model resource.
 
 ## Data and memory lifecycle
 

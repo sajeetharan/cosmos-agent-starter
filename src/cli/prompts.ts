@@ -9,6 +9,7 @@ import type {
   StorageBackend,
 } from "./arguments.js";
 import { listScenarios } from "../generator/compose.js";
+import { brandBanner, style } from "./style.js";
 
 interface Choice<T extends string> {
   value: T;
@@ -22,14 +23,16 @@ async function choose<T extends string>(
   choices: readonly Choice<T>[],
   fallback: T,
 ): Promise<T> {
-  console.log(`\n${question}`);
+  console.log(`\n${style.bold(question)}`);
   for (const [index, choice] of choices.entries()) {
-    const marker = choice.value === fallback ? " (default)" : "";
-    console.log(`  ${index + 1}. ${choice.label}${marker}`);
-    console.log(`     ${choice.description}`);
+    const marker = choice.value === fallback ? style.cyan(" (default)") : "";
+    console.log(`  ${style.cyan(String(index + 1))}. ${choice.label}${marker}`);
+    console.log(`     ${style.dim(choice.description)}`);
   }
   const fallbackIndex = choices.findIndex((choice) => choice.value === fallback) + 1;
-  const answer = (await readline.question(`Select an option [${fallbackIndex}]: `))
+  const answer = (await readline.question(
+    `${style.cyan(">")} Select an option [${fallbackIndex}]: `,
+  ))
     .trim()
     .toLowerCase();
   if (!answer) return fallback;
@@ -46,10 +49,11 @@ export async function completeInteractiveOptions(options: CliOptions): Promise<C
   if (options.yes) return options;
   const readline = createInterface({ input: stdin, output: stdout });
   try {
+    console.log(`\n${brandBanner()}`);
     console.log(options.command === "bootstrap"
-      ? "\nBootstrap Cosmos Agent guided setup"
-      : "\nCreate Cosmos Agent guided setup");
-    console.log("Press Enter to accept any default.");
+      ? `\n${style.bold("Bootstrap guided setup")}`
+      : `\n${style.bold("Create guided setup")}`);
+    console.log(style.dim("Press Enter to accept any default."));
     const destination =
       options.destination || (await readline.question("\nProject destination: ")).trim();
     if (!destination) throw new Error("A project destination is required.");

@@ -48,13 +48,19 @@ describe("CLI arguments", () => {
     [["--help"], "help"],
     [["-v"], "version"],
     [["doctor", "./sample"], "doctor"],
+    [["prepare-azure", "./sample"], "prepare-azure"],
     [["validate", "-C", "./sample"], "validate"],
   ] as const)("supports command aliases for %j", (args, command) => {
     expect(parseArguments([...args])).toMatchObject({ command });
   });
 
-  it("targets doctor and validate projects by positional argument or -C", () => {
+  it("targets project inspection commands by positional argument or -C", () => {
     expect(parseArguments(["doctor", "./one"])).toMatchObject({ projectDirectory: "./one" });
+    expect(parseArguments(["prepare-azure", "./one", "--environment", "one-dev"]))
+      .toMatchObject({
+        projectDirectory: "./one",
+        environmentName: "one-dev",
+      });
     expect(parseArguments(["validate", "-C", "./two"])).toMatchObject({
       projectDirectory: "./two",
     });

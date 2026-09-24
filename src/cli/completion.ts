@@ -10,9 +10,10 @@ export interface CompletionCandidate {
 const commands: CompletionCandidate[] = [
   { value: "wizard", description: "Create a project with guided choices" },
   { value: "create", description: "Create a project" },
-  { value: "bootstrap", description: "Scaffold, install, link, and optionally deploy a project" },
+  { value: "bootstrap", description: "Scaffold, install, link, and optionally deploy a configured project" },
   { value: "list", description: "List scenario templates" },
   { value: "doctor", description: "Inspect security and configuration" },
+  { value: "prepare-azure", description: "Check Azure deployment readiness" },
   { value: "validate", description: "Validate a generated project" },
   { value: "completion", description: "Print shell completion setup" },
 ];

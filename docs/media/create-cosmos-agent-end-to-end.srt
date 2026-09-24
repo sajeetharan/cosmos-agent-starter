@@ -1,0 +1,47 @@
+1
+00:00:00,000 --> 00:00:09,500
+In this walkthrough, we go from an empty folder to a Cosmos-backed agent running locally, then preview the exact path to Azure.
+
+2
+00:00:09,800 --> 00:00:24,700
+Bootstrap selects the chat-agent template, targets the Cosmos DB emulator, installs dependencies, initializes Git, and links a local deployment context. It does not create Azure resources.
+
+3
+00:00:25,000 --> 00:00:39,800
+The generated repository includes the API, React experience, agent and memory packages, security tests, Docker configuration, Bicep infrastructure, and Copilot guidance.
+
+4
+00:00:40,100 --> 00:00:55,800
+Copy the environment file, add the documented emulator development key, start Docker Compose, and run emulator init. This creates the local database, vector-enabled agent state, and approval container.
+
+5
+00:00:56,100 --> 00:01:07,300
+Start the project. The API and web application run together, while the deterministic local provider keeps the walkthrough credential-free and repeatable.
+
+6
+00:01:07,600 --> 00:01:19,399
+Open the generated workspace. The status chips confirm that the mock provider is active and storage is backed by Cosmos DB, not an in-memory substitute.
+
+7
+00:01:19,699 --> 00:01:32,300
+The first request stores a scoped memory. The follow-up question performs vector retrieval and returns citations, making the emulator-backed memory flow visible and auditable.
+
+8
+00:01:32,600 --> 00:01:47,200
+The operations view shows real Cosmos request charges, query and create latency, correlation identifiers, and the default redaction policy. This run completed without recorded errors.
+
+9
+00:01:47,500 --> 00:01:59,500
+Before cloud deployment, run type checking, tests, the production build, and the built-in doctor. These are the same gates intended for continuous integration.
+
+10
+00:01:59,800 --> 00:02:15,600
+The cloud design provisions Container Apps, a user-assigned managed identity, Cosmos DB, monitoring, and the selected model provider. Authentication and least-privilege access replace local development credentials.
+
+11
+00:02:15,900 --> 00:02:30,799
+When the application is ready, authenticate with A Z D, set the required Entra and model values, and run A Z D up. This recording stops before provisioning so no billable resources are created.
+
+12
+00:02:31,100 --> 00:02:43,799
+That is the complete path: bootstrap once, prove the agent locally against Cosmos DB, validate the safety contracts, and deploy deliberately when the team is ready.

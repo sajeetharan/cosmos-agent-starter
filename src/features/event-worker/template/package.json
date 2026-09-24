@@ -16,6 +16,7 @@
     "test:scenario": "vitest run tests/scenarios",
     "test:cost": "vitest run tests/cost",
     "test:integration": "vitest run tests/integration",
+    "emulator:init": "tsx scripts/init-emulator.ts",
     "seed": "tsx scripts/seed.ts",
     "cleanup": "tsx scripts/cleanup.ts",
     "emulator:init": "tsx scripts/init-emulator.ts"
