@@ -45,4 +45,3 @@ When the application is ready, authenticate with A Z D, set the required Entra a
 12
 00:02:31,100 --> 00:02:43,799
 That is the complete path: bootstrap once, prove the agent locally against Cosmos DB, validate the safety contracts, and deploy deliberately when the team is ready.
-
