@@ -269,7 +269,7 @@ If your corporate npm proxy has not mirrored the latest release, download the `.
 [GitHub Releases](https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/releases) and run:
 
 ```powershell
-npx --yes --package .\create-cosmos-agent-0.4.0.tgz create-cosmos-agent my-agent --yes
+npx --yes --package .\create-cosmos-agent-0.5.0.tgz create-cosmos-agent my-agent --yes
 ```
 
 ## Develop the CLI
