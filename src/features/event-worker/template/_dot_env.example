@@ -23,7 +23,7 @@ OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
 
 # Cosmos DB (required when MEMORY_BACKEND=cosmos)
-COSMOS_ENDPOINT=https://localhost:8081
+COSMOS_ENDPOINT=http://localhost:8081
 COSMOS_DATABASE=cosmos-agent
 COSMOS_EMULATOR=true
 COSMOS_EMULATOR_KEY=

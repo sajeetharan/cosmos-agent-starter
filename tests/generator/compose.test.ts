@@ -54,7 +54,11 @@ describe("scenario composition", () => {
       .toMatch(/isolates conversation, durable memory, deletion, and approval flows/);
     expect(await readFile(join(first, "infra", "modules", "cosmos.bicep"), "utf8"))
       .toMatch(/name: 'conversation-history'[\s\S]*name: 'agent-memory'/);
-  });
+    expect(JSON.parse(await readFile(join(first, "package.json"), "utf8")))
+      .toMatchObject({ scripts: { "emulator:init": "tsx scripts/init-emulator.ts" } });
+    expect(await readFile(join(first, "docker-compose.yml"), "utf8"))
+      .toMatch(/PROTOCOL: http/);
+  }, 15_000);
   it("composes every customer template with scenario-specific metadata", async () => {
     for (const template of [
       "chat-agent-ts",
@@ -73,6 +77,11 @@ describe("scenario composition", () => {
       expect(await readFile(join(path, "apps", "api", "src", "server.ts"), "utf8"))
         .toContain(`id: "${template}"`);
     }
+  }, 15_000);
+  it("does not leave web Docker copy steps in the API-only memory template", async () => {
+    const path = await destination();
+    await composeProject({ ...options(path), template: "agent-memory-ts" });
+    expect(await readFile(join(path, "Dockerfile"), "utf8")).not.toContain("apps/web");
   });
   it("composes an API-free event worker with retry-safe contracts", async () => {
     const path = await destination();
@@ -89,6 +98,9 @@ describe("scenario composition", () => {
       .toContain("idempotencyKey");
     expect(await readFile(join(path, "infra", "modules", "service-bus.bicep"), "utf8"))
       .toContain("maxDeliveryCount: 10");
+    expect(await readFile(join(path, "infra", "main.parameters.json"), "utf8"))
+      .not.toContain("ENTRA_TENANT_ID");
+    expect(await readFile(join(path, "README.md"), "utf8")).toContain("Service Bus");
   });
   it("writes assisted provider, authentication, and storage selections", async () => {
     const path = await destination();
@@ -139,7 +151,7 @@ describe("scenario composition", () => {
     expect(await readFile(join(path, ".github", "customer-owned.txt"), "utf8")).toBe("preserve me");
     expect(await readFile(join(path, ".github", "copilot-instructions.md"), "utf8"))
       .toMatch(/DefaultAzureCredential/);
-  });
+  }, 15_000);
   it("doctor detects intentionally unsafe patterns", async () => {
     const path = await destination();
     await composeProject(options(path));

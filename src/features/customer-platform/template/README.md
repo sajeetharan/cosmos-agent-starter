@@ -77,10 +77,13 @@ available for extension.
 
 Development defaults to `MEMORY_BACKEND=in-memory`. To use Cosmos DB:
 
-1. Start the emulator with `docker compose up -d`, or use an Azure Cosmos DB for NoSQL account.
-2. Configure `COSMOS_ENDPOINT`, `COSMOS_DATABASE`, and emulator credentials when applicable.
-3. Set `MEMORY_BACKEND=cosmos`.
-4. Restart the application.
+1. Copy `.env.example` to `.env` and set the documented emulator key.
+2. Start the emulator with `docker compose up -d`.
+3. Run `npm run emulator:init` to create the local database and containers.
+4. Start the application with `npm run dev`.
+
+The emulator uses HTTP only for local development. Azure deployments use TLS and
+`DefaultAzureCredential`.
 
 Production uses `DefaultAzureCredential`, a singleton `CosmosClient`, hierarchical partition keys,
 bounded parameterized vector queries, continuation-aware reads, and ETag concurrency for protected
@@ -116,9 +119,13 @@ azd env set ENTRA_SCOPE "<api-scope>"
 azd env set AI_PROVIDER "azure-openai"
 azd env set AZURE_OPENAI_ENDPOINT "<endpoint>"
 azd env set AZURE_OPENAI_CHAT_DEPLOYMENT "<deployment>"
+npx create-cosmos-agent prepare-azure . --environment <environment-name>
 azd up
 ```
 
-Azure deployment can create billable resources. The runtime uses a user-assigned Managed Identity
-for Cosmos DB and Azure OpenAI access. Grant the identity the minimum required Azure OpenAI role on
-the selected model resource.
+The readiness check does not create resources. It verifies `azd` authentication, Entra settings,
+the selected production provider, and the Cosmos DB capacity choice before deployment. Azure OpenAI
+capacity is bring-your-own: confirm that the configured deployment has regional quota. Azure
+deployment can create billable resources. The runtime uses a user-assigned Managed Identity for
+Cosmos DB and Azure OpenAI access; grant it the `Cognitive Services OpenAI User` role on the selected
+model resource.

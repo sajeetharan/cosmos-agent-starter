@@ -2,6 +2,10 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
+import {
+  runAzureReadiness,
+  type AzureReadinessResult,
+} from "./azure-readiness.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -13,6 +17,10 @@ export interface BootstrapCommand {
 }
 
 export type BootstrapCommandRunner = (command: BootstrapCommand) => Promise<void>;
+export type AzureReadinessRunner = (
+  root: string,
+  environmentName?: string,
+) => Promise<AzureReadinessResult>;
 
 export interface BootstrapProjectOptions {
   destination: string;
@@ -92,6 +100,7 @@ async function writeContext(
 export async function bootstrapProject(
   options: BootstrapProjectOptions,
   runner: BootstrapCommandRunner = runBootstrapCommand,
+  readiness: AzureReadinessRunner = runAzureReadiness,
 ): Promise<BootstrapResult> {
   const silent = options.silent ?? false;
   if (options.deploy && !options.linkProject) {
@@ -134,6 +143,16 @@ export async function bootstrapProject(
     });
   }
   if (options.deploy && environmentName) {
+    const result = await readiness(options.destination, environmentName);
+    if (!result.ready) {
+      const blockers = result.findings
+        .filter((item) => item.severity === "error")
+        .map((item) => `${item.message} ${item.remediation}`);
+      throw new Error(
+        `Azure deployment is not ready:\n- ${blockers.join("\n- ")}\n` +
+          `Run create-cosmos-agent prepare-azure . --environment ${environmentName} for the full report.`,
+      );
+    }
     await runner({
       executable: "azd",
       args: ["up", "--environment", environmentName, "--no-prompt"],

@@ -12,16 +12,19 @@ import {
   type CompletionShell,
 } from "./completion.js";
 import {
-  helpText,
+  formatHelp,
   nextSteps,
   printFindings,
+  printAzureReadiness,
   printNextSteps,
   summarizeFindings,
 } from "./output.js";
+import { brandBanner, statusTag, style } from "./style.js";
 import { composeProject, listScenarios, loadScenario } from "../generator/compose.js";
 import { runDoctor } from "../generator/doctor.js";
 import { validateProject } from "../generator/validate.js";
 import { bootstrapProject } from "../generator/bootstrap.js";
+import { runAzureReadiness } from "../generator/azure-readiness.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -55,7 +58,7 @@ export async function runCli(args: string[]): Promise<number> {
     let options = parseArguments(args);
     json = options.json;
     if (options.command === "help") {
-      console.log(helpText);
+      console.log(formatHelp());
       return 0;
     }
     if (options.command === "version") {
@@ -69,7 +72,10 @@ export async function runCli(args: string[]): Promise<number> {
       if (options.json) writeJson({ templates: scenarios });
       else {
         for (const scenario of scenarios) {
-          console.log(`${scenario.id}\t${scenario.name}\t${scenario.description}`);
+          console.log(
+            `${style.cyan(scenario.id)}\t${style.bold(scenario.name)}\t` +
+              `${style.dim(scenario.description)}`,
+          );
         }
       }
       return 0;
@@ -90,6 +96,21 @@ export async function runCli(args: string[]): Promise<number> {
         printFindings(findings);
       }
       return summary.errors > 0 ? 1 : 0;
+    }
+    if (options.command === "prepare-azure") {
+      const project = resolve(options.projectDirectory);
+      const result = await runAzureReadiness(project, options.environmentName);
+      if (options.json) {
+        writeJson({
+          command: "prepare-azure",
+          project,
+          status: result.ready ? "ready" : "blocked",
+          ...result,
+        });
+      } else {
+        printAzureReadiness(result.environmentName, result.findings);
+      }
+      return result.ready ? 0 : 1;
     }
     if (options.command === "validate") {
       const project = resolve(options.projectDirectory);
@@ -134,13 +155,14 @@ export async function runCli(args: string[]): Promise<number> {
       };
       if (options.json) writeJson(plan);
       else {
-        console.log("Generation plan:");
+        console.log(brandBanner());
+        console.log(`\n${style.bold("Generation plan")}`);
         console.log(JSON.stringify(plan, null, 2));
       }
       return 0;
     }
     const created = await composeProject(options);
-    const includeWeb = scenario.category !== "event" && options.includeWeb;
+    const includeWeb = scenario.capabilities.includes("react-web") && options.includeWeb;
     if (options.command === "bootstrap") {
       const result = await bootstrapProject({
         destination: created,
@@ -160,19 +182,43 @@ export async function runCli(args: string[]): Promise<number> {
           nextSteps: [
             "npm run dev",
             ...(!result.deployed && result.environmentName
-              ? [`azd up --environment ${result.environmentName}`]
+              ? [
+                  `npx create-cosmos-agent prepare-azure . --environment ${result.environmentName}`,
+                  `azd up --environment ${result.environmentName}`,
+                ]
               : []),
           ],
         });
       } else {
-        console.log(`\nBootstrapped Cosmos Agent in ${created}`);
-        console.log(`  Dependencies: ${result.dependenciesInstalled ? "installed" : "skipped"}`);
-        console.log(`  Git: ${result.gitInitialized ? "initialized" : "skipped"}`);
-        console.log(`  Project context: ${result.linked ? `linked to ${result.environmentName}` : "skipped"}`);
-        console.log(`  Azure deployment: ${result.deployed ? "completed" : "not requested"}`);
-        console.log("\nNext step: npm run dev");
+        console.log(`\n${brandBanner()}`);
+        console.log(`\n${statusTag("success")} ${style.bold("Bootstrap complete")}`);
+        console.log(`  ${style.dim(created)}`);
+        console.log(
+          `  ${result.dependenciesInstalled ? statusTag("success") : statusTag("info")} ` +
+            `Dependencies ${result.dependenciesInstalled ? "installed" : "skipped"}`,
+        );
+        console.log(
+          `  ${result.gitInitialized ? statusTag("success") : statusTag("info")} ` +
+            `Git ${result.gitInitialized ? "initialized" : "skipped"}`,
+        );
+        console.log(
+          `  ${result.linked ? statusTag("success") : statusTag("info")} Project context ` +
+            `${result.linked ? `linked to ${result.environmentName}` : "skipped"}`,
+        );
+        console.log(
+          `  ${result.deployed ? statusTag("success") : statusTag("info")} Azure deployment ` +
+            `${result.deployed ? "completed" : "not requested"}`,
+        );
+        console.log(`\n${style.bold("Next step")} ${style.cyan("npm run dev")}`);
         if (!result.deployed && result.environmentName) {
-          console.log(`Azure: azd up --environment ${result.environmentName}`);
+          console.log(`\n${style.bold("When you are ready for Azure")}`);
+          console.log(
+            `  ${style.blue(">")} npx create-cosmos-agent prepare-azure . ` +
+              `--environment ${result.environmentName}`,
+          );
+          console.log(
+            `  ${style.blue(">")} azd up --environment ${result.environmentName}`,
+          );
         }
       }
       return 0;
@@ -193,7 +239,10 @@ export async function runCli(args: string[]): Promise<number> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (json) console.error(JSON.stringify({ status: "error", message }));
-    else console.error(`Error: ${message}\nRun with --help for usage.`);
+    else console.error(
+      `${statusTag("error")} ${style.bold(message)}\n` +
+        `${style.dim("Run with --help for usage.")}`,
+    );
     return 1;
   }
 }

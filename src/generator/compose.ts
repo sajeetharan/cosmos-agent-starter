@@ -68,14 +68,15 @@ async function configureWebOption(destination: string, includeWeb: boolean): Pro
     workspaces?: string[];
     scripts?: Record<string, string>;
   };
-  if (!packageJson.workspaces?.includes("apps/web")) return;
-  packageJson.workspaces = packageJson.workspaces.filter((workspace) => workspace !== "apps/web");
-  if (packageJson.scripts) {
-    packageJson.scripts.dev = "npm run dev:api";
-    packageJson.scripts.build = "tsc -p tsconfig.json";
-    packageJson.scripts.typecheck = "tsc -p tsconfig.json --noEmit";
+  if (packageJson.workspaces?.includes("apps/web")) {
+    packageJson.workspaces = packageJson.workspaces.filter((workspace) => workspace !== "apps/web");
+    if (packageJson.scripts) {
+      packageJson.scripts.dev = "npm run dev:api";
+      packageJson.scripts.build = "tsc -p tsconfig.json";
+      packageJson.scripts.typecheck = "tsc -p tsconfig.json --noEmit";
+    }
+    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
   }
-  await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
   const dockerfilePath = join(destination, "Dockerfile");
   try {
     const dockerfile = await readFile(dockerfilePath, "utf8");
@@ -134,7 +135,10 @@ export async function composeProject(options: CliOptions): Promise<string> {
     DEFAULT_AUTH_MODE: options.authMode,
     DEFAULT_STORAGE_BACKEND: options.storage,
   });
-  await configureWebOption(destination, scenario.category === "event" ? false : options.includeWeb);
+  await configureWebOption(
+    destination,
+    scenario.capabilities.includes("react-web") && options.includeWeb,
+  );
   await validateGeneratedFiles(destination);
   return destination;
 }

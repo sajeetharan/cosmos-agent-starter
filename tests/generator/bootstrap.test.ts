@@ -29,7 +29,11 @@ describe("project bootstrap", () => {
       silent: true,
     }, async (command) => {
       commands.push(command);
-    });
+    }, async (_root, environmentName) => ({
+      ready: true,
+      environmentName: environmentName!,
+      findings: [],
+    }));
     expect(commands).toHaveLength(3);
     expect([
       commands[0]?.executable,
@@ -52,5 +56,33 @@ describe("project bootstrap", () => {
   it("derives a safe environment name and rejects invalid explicit names", () => {
     expect(resolveEnvironmentName(join("projects", "My Agent"))).toBe("my-agent");
     expect(() => resolveEnvironmentName("demo", "not_valid")).toThrow(/environment names/i);
+  });
+
+  it("does not invoke azd up when readiness checks are blocked", async () => {
+    const destination = await mkdtemp(join(tmpdir(), "cosmos-bootstrap-"));
+    created.push(destination);
+    const commands: BootstrapCommand[] = [];
+    await expect(bootstrapProject({
+      destination,
+      template: "chat-agent-ts",
+      installDependencies: false,
+      initializeGit: false,
+      linkProject: true,
+      deploy: true,
+      environmentName: "sample-dev",
+      silent: true,
+    }, async (command) => {
+      commands.push(command);
+    }, async (_root, environmentName) => ({
+      ready: false,
+      environmentName: environmentName!,
+      findings: [{
+        severity: "error",
+        code: "AZD_AUTH",
+        message: "Azure Developer CLI is not signed in.",
+        remediation: "Run azd auth login.",
+      }],
+    }))).rejects.toThrow(/not ready/i);
+    expect(commands).toHaveLength(0);
   });
 });
