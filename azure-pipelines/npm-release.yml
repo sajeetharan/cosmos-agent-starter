@@ -1,0 +1,176 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: confirmPublish
+    displayName: Publish the tagged package to npm through ESRP
+    type: boolean
+    default: false
+
+variables:
+  - group: esrp-npm-release
+  - name: npmPackageDirectory
+    value: $(Build.ArtifactStagingDirectory)/npm-packages
+
+stages:
+  - stage: Build
+    displayName: Validate and pack
+    jobs:
+      - job: Pack
+        displayName: Build immutable npm package
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            clean: true
+            fetchDepth: 0
+            fetchTags: true
+
+          - task: NodeTool@0
+            displayName: Use Node.js 20
+            inputs:
+              versionSpec: 20.x
+
+          - script: npm ci
+            displayName: Install dependencies
+
+          - script: |
+              set -euo pipefail
+              npm run validate
+              npm run lint
+            displayName: Validate package
+
+          - script: |
+              set -euo pipefail
+
+              if [ "$(Build.SourceBranch)" != "refs/heads/main" ]; then
+                echo "##vso[task.logissue type=error]ESRP releases must run from main."
+                exit 1
+              fi
+
+              package_name="$(node -p "require('./package.json').name")"
+              package_version="$(node -p "require('./package.json').version")"
+              package_private="$(node -p "String(require('./package.json').private === true)")"
+              expected_tag="v${package_version}"
+
+              if [ "$package_private" = "true" ]; then
+                echo "##vso[task.logissue type=error]Private npm packages cannot be published."
+                exit 1
+              fi
+
+              if [ "$package_name" != "create-cosmos-agent" ]; then
+                echo "##vso[task.logissue type=error]Unexpected npm package: $package_name"
+                exit 1
+              fi
+
+              if ! git tag --points-at HEAD --list "$expected_tag" | grep -Fxq "$expected_tag"; then
+                echo "##vso[task.logissue type=error]HEAD must have the release tag $expected_tag."
+                exit 1
+              fi
+
+              mkdir -p "$(npmPackageDirectory)"
+              npm pack --pack-destination "$(npmPackageDirectory)"
+
+              mapfile -t packages < <(find "$(npmPackageDirectory)" -type f -name '*.tgz')
+              if [ "${#packages[@]}" -ne 1 ]; then
+                echo "##vso[task.logissue type=error]Expected exactly one npm package, found ${#packages[@]}."
+                exit 1
+              fi
+
+              packed_version="$(
+                tar -xOf "${packages[0]}" package/package.json |
+                  node -e '
+                    let input = "";
+                    process.stdin.on("data", (chunk) => input += chunk);
+                    process.stdin.on("end", () => process.stdout.write(JSON.parse(input).version));
+                  '
+              )"
+              if [ "$packed_version" != "$package_version" ]; then
+                echo "##vso[task.logissue type=error]Packed version $packed_version does not match $package_version."
+                exit 1
+              fi
+
+              echo "Prepared $package_name@$package_version for ESRP."
+              sha256sum "${packages[0]}"
+            displayName: Enforce release invariants and pack
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish immutable npm artifact
+            inputs:
+              targetPath: $(npmPackageDirectory)
+              artifact: npm-packages
+              publishLocation: pipeline
+
+  - stage: Release
+    displayName: Sign and publish through ESRP
+    dependsOn: Build
+    condition: and(succeeded(), ${{ eq(parameters.confirmPublish, true) }})
+    jobs:
+      - deployment: PublishNpm
+        displayName: Publish npm package
+        pool:
+          vmImage: ubuntu-latest
+        environment: npm-production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: npm-packages
+
+                - bash: |
+                    set -euo pipefail
+
+                    required_variables=(
+                      ESRP_SERVICE_CONNECTION
+                      ESRP_KEY_VAULT_NAME
+                      ESRP_SIGN_CERT_NAME
+                      ESRP_CLIENT_ID
+                      ESRP_OWNER
+                      ESRP_APPROVER
+                    )
+                    for variable in "${required_variables[@]}"; do
+                      if [ -z "${!variable:-}" ]; then
+                        echo "##vso[task.logissue type=error]Required variable $variable is not configured."
+                        exit 1
+                      fi
+                    done
+
+                    for alias in "$ESRP_OWNER" "$ESRP_APPROVER"; do
+                      if [[ ! "$alias" =~ ^[^,;[:space:]]+@microsoft\.com$ ]]; then
+                        echo "##vso[task.logissue type=error]Owners and approvers must be individual @microsoft.com aliases."
+                        exit 1
+                      fi
+                    done
+
+                    if [ "$ESRP_OWNER" = "$ESRP_APPROVER" ]; then
+                      echo "##vso[task.logissue type=error]Use different individuals for ESRP owner and approver."
+                      exit 1
+                    fi
+                  displayName: Validate ESRP release configuration
+                  env:
+                    ESRP_SERVICE_CONNECTION: $(ESRP_SERVICE_CONNECTION)
+                    ESRP_KEY_VAULT_NAME: $(ESRP_KEY_VAULT_NAME)
+                    ESRP_SIGN_CERT_NAME: $(ESRP_SIGN_CERT_NAME)
+                    ESRP_CLIENT_ID: $(ESRP_CLIENT_ID)
+                    ESRP_OWNER: $(ESRP_OWNER)
+                    ESRP_APPROVER: $(ESRP_APPROVER)
+
+                - task: EsrpRelease@12
+                  displayName: Publish to npm
+                  inputs:
+                    connectedservicename: $(ESRP_SERVICE_CONNECTION)
+                    usemanagedidentity: true
+                    keyvaultname: $(ESRP_KEY_VAULT_NAME)
+                    signcertname: $(ESRP_SIGN_CERT_NAME)
+                    clientid: $(ESRP_CLIENT_ID)
+                    intent: PackageDistribution
+                    contenttype: npm
+                    contentsource: Folder
+                    folderlocation: $(Pipeline.Workspace)/npm-packages
+                    waitforreleasecompletion: true
+                    owners: $(ESRP_OWNER)
+                    approvers: $(ESRP_APPROVER)
+                    serviceendpointurl: https://api.esrp.microsoft.com
+                    mainpublisher: ESRPRELPACMAN
+                    domaintenantid: 975f013f-7f24-47e8-a7d3-abc4752bf346
