@@ -282,7 +282,8 @@ npm run validate
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
-[SECURITY.md](SECURITY.md) for vulnerability reporting.
+[SECURITY.md](SECURITY.md) for vulnerability reporting. Maintainers must publish npm releases
+through the [Microsoft ESRP release process](docs/releasing-npm.md).
 
 ## License
 

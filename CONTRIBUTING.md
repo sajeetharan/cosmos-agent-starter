@@ -8,3 +8,6 @@ only language/runtime fundamentals. Tests should generate into OS temporary dire
 
 For generated-output changes, run the generator tests, generate a fresh project, run `npm install`,
 `npm run typecheck`, `npm test`, and `npm run build` inside it, then run `doctor` and `validate`.
+
+Maintainers must follow [the ESRP npm release process](docs/releasing-npm.md). Direct npm publishing
+from developer machines or GitHub Actions is not supported.
