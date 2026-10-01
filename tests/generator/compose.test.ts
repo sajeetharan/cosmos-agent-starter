@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ const options = (path: string) => ({
   localMode: "emulator" as const, capacity: "serverless" as const,
   provider: "mock" as const, authMode: "local" as const, storage: "in-memory" as const,
   includeWeb: true, initializeGit: false, yes: true, force: true, dryRun: false,
-  json: false, projectDirectory: ".",
+  json: false, projectDirectory: ".", azureSetup: "later" as const,
 });
 
 describe("scenario composition", () => {
@@ -49,7 +49,9 @@ describe("scenario composition", () => {
     expect(await readFile(join(first, "docs", "architecture.md"), "utf8"))
       .toMatch(/Conversation store[\s\S]*Durable memory store/);
     expect(await readFile(join(first, "scripts", "init-emulator.ts"), "utf8"))
-      .toMatch(/conversation-history[\s\S]*agent-memory/);
+      .toMatch(/conversation-history[\s\S]*agent-memory[\s\S]*vectorEmbeddingPolicy/);
+    expect(await readFile(join(first, "scripts", "init-emulator.ts"), "utf8"))
+      .not.toContain("vectorIndexes");
     expect(await readFile(join(first, "tests", "scenarios", "multi-tenant.test.ts"), "utf8"))
       .toMatch(/isolates conversation, durable memory, deletion, and approval flows/);
     expect(await readFile(join(first, "infra", "modules", "cosmos.bicep"), "utf8"))
@@ -123,6 +125,60 @@ describe("scenario composition", () => {
         storage: { development: "cosmos", cosmosConnection: "azure" },
       });
   });
+  it("starts and initializes the selected local emulator through npm run dev", async () => {
+    const path = await destination();
+    await composeProject({
+      ...options(path),
+      template: "chat-agent-ts",
+      storage: "cosmos",
+      localMode: "emulator",
+    });
+    const packageSource = await readFile(join(path, "package.json"), "utf8");
+    const packageJson = JSON.parse(packageSource) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageSource.match(/"emulator:init"/g)).toHaveLength(1);
+    expect(packageJson.scripts).toMatchObject({
+      "dev:app": "concurrently -k -n api,web -c blue,magenta \"npm:dev:api\" \"npm:dev:web\"",
+      "emulator:start": "docker compose up -d --wait",
+      "emulator:stop": "docker compose down",
+      predev: "npm run emulator:start && npm run emulator:init",
+    });
+    expect(await readFile(join(path, ".env"), "utf8")).toMatch(
+      /^COSMOS_EMULATOR_KEY=.+$/m,
+    );
+    expect(await readFile(join(path, "apps", "api", "src", "server.ts"), "utf8"))
+      .toContain("The request failed. Check the API logs for details.");
+  });
+  it("does not start the emulator for in-memory development", async () => {
+    const path = await destination();
+    await composeProject({ ...options(path), template: "chat-agent-ts" });
+    const packageJson = JSON.parse(await readFile(join(path, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageJson.scripts.predev).toBeUndefined();
+    await expect(readFile(join(path, ".env"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+  it("writes existing Azure resource endpoints into the local environment", async () => {
+    const path = await destination();
+    await composeProject({
+      ...options(path),
+      template: "customer-support-ts",
+      provider: "azure-openai",
+      storage: "cosmos",
+      localMode: "azure",
+      azureSetup: "existing",
+      azureOpenAIEndpoint: "https://sample.openai.azure.com",
+      azureOpenAIChatDeployment: "chat",
+      cosmosEndpoint: "https://sample.documents.azure.com:443/",
+    });
+    const environment = await readFile(join(path, ".env"), "utf8");
+    expect(environment).toMatch(/^AZURE_OPENAI_ENDPOINT=https:\/\/sample\.openai\.azure\.com$/m);
+    expect(environment).toMatch(/^AZURE_OPENAI_CHAT_DEPLOYMENT=chat$/m);
+    expect(environment).toMatch(/^COSMOS_ENDPOINT=https:\/\/sample\.documents\.azure\.com:443\/$/m);
+    expect(environment).toMatch(/^COSMOS_EMULATOR=false$/m);
+    expect(environment).toMatch(/^COSMOS_EMULATOR_KEY=$/m);
+  });
   it("produces a buildable API-only layout with --no-web", async () => {
     const path = await destination();
     await composeProject({ ...options(path), template: "chat-agent-ts", includeWeb: false });
@@ -152,11 +208,36 @@ describe("scenario composition", () => {
     expect(await readFile(join(path, ".github", "copilot-instructions.md"), "utf8"))
       .toMatch(/DefaultAzureCredential/);
   }, 15_000);
+  it("ignores installed workspace links when force-overwriting a project", async () => {
+    const path = await destination();
+    await composeProject({ ...options(path), template: "customer-support-ts" });
+    const modules = join(path, "node_modules");
+    await mkdir(modules);
+    await symlink(join(path, "apps", "api"), join(modules, "workspace-api"), "junction");
+    await expect(composeProject({
+      ...options(path),
+      template: "customer-support-ts",
+      storage: "cosmos",
+      force: true,
+    })).resolves.toBe(path);
+  }, 15_000);
   it("doctor detects intentionally unsafe patterns", async () => {
     const path = await destination();
     await composeProject(options(path));
     await writeFile(join(path, "unsafe.ts"), "container.items.query(`SELECT * FROM c WHERE c.id = '${id}'`).fetchAll();");
     const findings = await runDoctor(path);
-    expect(findings.map((finding) => finding.code)).toEqual(expect.arrayContaining(["UNBOUNDED_FETCH", "UNBOUNDED_SELECT"]));
+    expect(findings.map((finding) => finding.code)).toEqual(expect.arrayContaining([
+      "QUERY_INTERPOLATION",
+      "UNBOUNDED_FETCH",
+      "UNBOUNDED_SELECT",
+    ]));
+  });
+  it("doctor permits bounded TOP interpolation in generated Cosmos queries", async () => {
+    const path = await destination();
+    await composeProject({ ...options(path), template: "customer-support-ts" });
+    const findings = await runDoctor(path);
+    expect(findings).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "QUERY_INTERPOLATION" }),
+    ]));
   });
 });

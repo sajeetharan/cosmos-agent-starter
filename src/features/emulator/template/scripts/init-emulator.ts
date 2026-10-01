@@ -6,7 +6,6 @@ import {
   PartitionKeyKind,
   VectorEmbeddingDataType,
   VectorEmbeddingDistanceFunction,
-  VectorIndexType,
 } from "@azure/cosmos";
 
 if (process.env.COSMOS_EMULATOR !== "true") {
@@ -53,7 +52,6 @@ await database.containers.createIfNotExists({
   indexingPolicy: {
     includedPaths: [{ path: "/*" }],
     excludedPaths: [{ path: "/embedding/*" }],
-    vectorIndexes: [{ path: "/embedding", type: VectorIndexType.QuantizedFlat }],
   },
 });
 await database.containers.createIfNotExists({
@@ -83,7 +81,6 @@ await database.containers.createIfNotExists({
   indexingPolicy: {
     includedPaths: [{ path: "/*" }],
     excludedPaths: [{ path: "/embedding/*" }],
-    vectorIndexes: [{ path: "/embedding", type: VectorIndexType.QuantizedFlat }],
   },
 });
 

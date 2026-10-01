@@ -11,7 +11,7 @@ Usage:
   create-cosmos-agent doctor [project] [--json]
   create-cosmos-agent prepare-azure [project] [--environment <name>] [--json]
   create-cosmos-agent validate [project] [--json]
-  create-cosmos-agent completion <powershell|bash|zsh>
+  create-cosmos-agent completion <powershell|bash|zsh|clink>
 
 Commands:
   create [destination]  Create a project (default command)
@@ -36,6 +36,15 @@ Create options:
       --link / --no-link     Create or skip local project context
   -e, --environment <name>   Azure environment name for bootstrap
       --deploy               Provision and deploy with azd (may create billable resources)
+        --azure-setup <mode>   later | existing | provision
+        --azure-location <id>  Azure region used when provisioning
+        --azure-openai-endpoint <url> Existing Azure OpenAI endpoint
+        --azure-openai-deployment <name> Existing chat model deployment
+        --cosmos-endpoint <url> Existing Azure Cosmos DB endpoint
+        --entra-tenant-id <id> Microsoft Entra tenant ID for deployment
+        --entra-audience <uri> Microsoft Entra API audience
+        --entra-client-id <id> Microsoft Entra SPA client ID
+        --entra-scope <scope>  Microsoft Entra API scope
   -y, --yes                  Accept prompt defaults; does not allow overwrites
   -f, --force                Allow generated files to overwrite a non-empty destination
       --dry-run              Print the resolved generation plan without writing files
@@ -55,6 +64,7 @@ Examples:
   create-cosmos-agent create my-agent --provider azure-openai --auth entra -y
   create-cosmos-agent my-agent --dry-run --json
   create-cosmos-agent completion powershell
+  create-cosmos-agent completion clink
   create-cosmos-agent doctor ./my-agent
   create-cosmos-agent prepare-azure ./my-agent --environment my-agent-dev
   create-cosmos-agent validate -C ./my-agent --json`;
@@ -75,17 +85,18 @@ export function nextSteps(destination: string, includeWeb = true): string[] {
 }
 
 export function printNextSteps(destination: string, includeWeb = true): void {
+  const steps = nextSteps(destination, includeWeb);
   console.log(`\n${brandBanner()}`);
   console.log(`\n${statusTag("success")} Created Cosmos Agent Starter`);
   console.log(`  ${style.dim(destination)}`);
   console.log(`\n${style.bold("Next steps")}`);
-  const steps = nextSteps(destination, includeWeb);
-  for (const step of steps.slice(0, includeWeb ? 4 : 3)) {
-    console.log(`  ${style.cyan(">")} ${step}`);
+  for (const [index, step] of steps.slice(0, includeWeb ? 4 : 3).entries()) {
+    console.log(`  ${style.cyan(String(index + 1) + ".")} ${step}`);
   }
   console.log(`\n${style.bold("When you are ready for Azure")}`);
   console.log(`  ${style.blue(">")} ${steps.at(-2)}`);
   console.log(`  ${style.blue(">")} ${steps.at(-1)}`);
+  console.log(`\n${style.dim("💡 Tip: Run 'npx create-cosmos-agent doctor .' to inspect environment security.")}`);
 }
 
 export function summarizeFindings(findings: DoctorFinding[]) {

@@ -9,18 +9,15 @@ customization points, portability boundaries, and invariants to preserve.
 
 ```powershell
 npm install
-Copy-Item .env.example .env
 npm run dev
 ```
 
-Development defaults to the in-memory adapter, so the API starts without Docker or Azure.
-To use the emulator, set `MEMORY_BACKEND=cosmos` and the documented emulator credentials in `.env`,
-then run:
+The guided setup writes the selected local adapters into the project. When Cosmos DB and the local
+emulator are selected, `npm run dev` starts the emulator, waits for it to become healthy, initializes
+its database and containers, and then starts the API. Stop the emulator when finished:
 
 ```powershell
-docker compose up -d
-npm run emulator:init
-npm run dev
+npm run emulator:stop
 ```
 
 The API expects trusted development headers `x-tenant-id` and `x-user-id` only in local mode.

@@ -8,18 +8,19 @@ Generated from the `{{SCENARIO_ID}}` scenario by `create-cosmos-agent`.
 
 ```powershell
 npm install
-Copy-Item .env.example .env
 npm run dev
 ```
 
-Open `http://localhost:5173`. Local development uses:
+Open `http://localhost:5173`. The guided setup writes the selected local provider, authentication,
+and storage adapters into the project.
 
-- deterministic mock AI responses;
-- in-memory storage;
-- local tenant and user headers entered in the web interface.
+When Cosmos DB and the local emulator are selected, `npm run dev` starts the emulator, waits for it
+to become healthy, initializes its database and containers, and then starts the application. Stop
+the emulator when finished:
 
-No cloud account, model key, or database is required for this path. In-memory data resets when
-the API restarts.
+```powershell
+npm run emulator:stop
+```
 
 ## Choose an AI provider
 
@@ -75,12 +76,9 @@ available for extension.
 
 ## Cosmos DB
 
-Development defaults to `MEMORY_BACKEND=in-memory`. To use Cosmos DB:
-
-1. Copy `.env.example` to `.env` and set the documented emulator key.
-2. Start the emulator with `docker compose up -d`.
-3. Run `npm run emulator:init` to create the local database and containers.
-4. Start the application with `npm run dev`.
+Projects generated with Cosmos DB and the local emulator include an ignored `.env` containing the
+well-known local-only emulator key. `npm run dev` handles startup and idempotent initialization.
+Projects generated with in-memory storage start directly and reset their data when the API restarts.
 
 The emulator uses HTTP only for local development. Azure deployments use TLS and
 `DefaultAzureCredential`.

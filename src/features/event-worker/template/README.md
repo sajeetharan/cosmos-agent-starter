@@ -8,12 +8,11 @@ Generated from the `{{SCENARIO_ID}}` scenario by `create-cosmos-agent`.
 
 ```powershell
 npm install
-Copy-Item .env.example .env
 npm run dev
 ```
 
-The worker reads one validated JSON event per line from stdin. Local development uses deterministic
-mock AI and in-memory state, so it needs no Azure subscription, credentials, or Docker.
+The worker reads one validated JSON event per line from stdin. The guided setup writes the selected
+local provider, authentication, and storage adapters into the project.
 
 ```json
 {
@@ -32,12 +31,13 @@ mock AI and in-memory state, so it needs no Azure subscription, credentials, or 
 
 ## Test with durable local memory
 
-```powershell
-docker compose up -d
-npm run emulator:init
-```
+When Cosmos DB and the local emulator are selected, `npm run dev` starts the emulator, waits for it
+to become healthy, initializes its database and containers, and then starts the worker. Stop the
+emulator when finished:
 
-Set `MEMORY_BACKEND=cosmos` in `.env`, add the documented emulator key, and run `npm run dev`.
+```powershell
+npm run emulator:stop
+```
 
 ## Validate
 

@@ -67,6 +67,18 @@ const orchestrator = new MultiAgentOrchestrator(provider);
 
 const context = (request: express.Request) => authenticateRequest(request.headers, process.env);
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === "object" && error !== null && "body" in error) {
+    const body = error.body;
+    if (typeof body === "object" && body !== null && "message" in body &&
+      typeof body.message === "string" && body.message.trim()) {
+      return body.message;
+    }
+  }
+  return "The request failed. Check the API logs for details.";
+}
+
 app.get("/health", (_request, response) => {
   response.json({ status: "ok", scenario: scenario.id });
 });
@@ -118,14 +130,17 @@ app.post("/api/memories", async (request, response, next) => {
       threadId: z.string().trim().min(1).max(128).default("default"),
       interactionId: z.string().trim().min(1),
       retentionClass: z.enum(["session", "standard", "long-term"]).default("standard"),
+      idempotencyKey: z.string().trim().min(1).max(10_000).optional(),
     }).parse(request.body);
     const requestContext = await context(request);
+    const { idempotencyKey, ...memory } = body;
     response.status(201).json(await memories.remember({
       context: requestContext,
       agentId: scenario.id,
       confidence: 1,
-      ...body,
+      ...memory,
       provenance: { interactionId: body.interactionId },
+      ...(idempotencyKey ? { idempotencyKey } : {}),
     }));
   } catch (error) {
     next(error);
@@ -297,7 +312,7 @@ app.use((
         ? error.statusCode
         : 500;
   response.status(status).json({
-    error: error instanceof Error ? error.message : "Unknown error",
+    error: errorMessage(error),
     ...(error instanceof z.ZodError ? { issues: error.issues } : {}),
   });
 });

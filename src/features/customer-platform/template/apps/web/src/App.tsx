@@ -33,6 +33,16 @@ interface ChatEntry {
   citations?: Citation[];
 }
 
+function uniqueCitations(citations: Citation[]): Citation[] {
+  const seen = new Set<string>();
+  return citations.filter((citation) => {
+    const key = `${citation.type}:${citation.label}:${citation.excerpt}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 const tabLabels: Record<Tab, string> = {
   chat: "Chat",
   knowledge: "Knowledge",
@@ -67,6 +77,11 @@ export function App({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState<ChatEntry[]>([]);
+  const [preference, setPreference] = useState(
+    "The customer prefers deployment notifications in Microsoft Teams.",
+  );
+  const [memoryStatus, setMemoryStatus] = useState("");
+  const [savingPreference, setSavingPreference] = useState(false);
   const [documentTitle, setDocumentTitle] = useState("");
   const [documentContent, setDocumentContent] = useState("");
   const [knowledgeResult, setKnowledgeResult] = useState<unknown>();
@@ -145,8 +160,34 @@ export function App({
       });
       setChat((entries) => [
         ...entries,
-        { role: "assistant", content: response.answer, citations: response.citations },
+        { role: "assistant", content: response.answer, citations: uniqueCitations(response.citations) },
       ]);
+    });
+  };
+
+  const savePreference = (event: FormEvent) => {
+    event.preventDefault();
+    const content = preference.trim();
+    if (!content) return;
+    setMemoryStatus("");
+    setSavingPreference(true);
+    void run(async () => {
+      try {
+        await api("/api/memories", {
+          method: "POST",
+          body: JSON.stringify({
+            type: "preference",
+            content,
+            threadId: "web-session",
+            interactionId: crypto.randomUUID(),
+            retentionClass: "standard",
+            idempotencyKey: content,
+          }),
+        });
+        setMemoryStatus(`Preference saved for ${userId}.`);
+      } finally {
+        setSavingPreference(false);
+      }
     });
   };
 
@@ -267,6 +308,23 @@ export function App({
                 </div>
                 <span className="status-chip">Memory enabled</span>
               </div>
+              <form className="memory-toolbar" onSubmit={savePreference}>
+                <label htmlFor="preference">Customer preference</label>
+                <input
+                  id="preference"
+                  value={preference}
+                  onChange={(event) => {
+                    setPreference(event.target.value);
+                    setMemoryStatus("");
+                  }}
+                  placeholder="Enter a preference to remember"
+                  required
+                />
+                <button className="secondary-button" disabled={busy || !preference.trim()}>
+                  {savingPreference ? "Saving..." : "Save preference"}
+                </button>
+                {memoryStatus && <p className="success-message" role="status">{memoryStatus}</p>}
+              </form>
               <div className="chat-window" aria-live="polite">
                 {chat.length === 0 && (
                   <div className="empty-state">

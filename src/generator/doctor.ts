@@ -35,6 +35,20 @@ function finding(
   return { severity, code, message, evidence, remediation };
 }
 
+function hasUnsafeQueryInterpolation(content: string): boolean {
+  for (const match of content.matchAll(/`([^`]*\bSELECT\b[\s\S]*?)`/gi)) {
+    const query = match[1];
+    if (query === undefined) continue;
+    for (const interpolation of query.matchAll(/\$\{([^}]+)\}/g)) {
+      const expression = interpolation[1]?.trim();
+      if (expression === undefined) return true;
+      const prefix = query.slice(0, interpolation.index);
+      if (!/^(?:boundedLimit|limit)$/.test(expression) || !/TOP\s+$/i.test(prefix)) return true;
+    }
+  }
+  return false;
+}
+
 export async function runDoctor(root: string): Promise<DoctorFinding[]> {
   const findings: DoctorFinding[] = [];
   if (Number(process.versions.node.split(".")[0]) < 20) {
@@ -58,7 +72,7 @@ export async function runDoctor(root: string): Promise<DoctorFinding[]> {
     if (/SELECT\s+\*/i.test(content) && !/TOP\s+\d+/i.test(content)) {
       findings.push(finding("warning", "UNBOUNDED_SELECT", "Unbounded SELECT * detected", evidence, "Project required fields and add TOP or pagination."));
     }
-    if (/SELECT.+\$\{(?!limit\})/i.test(content)) {
+    if (hasUnsafeQueryInterpolation(content)) {
       findings.push(finding("error", "QUERY_INTERPOLATION", "Interpolated query text detected", evidence, "Use named query parameters."));
     }
     if (/COSMOS_(?:KEY|CONNECTION_STRING)\s*=/i.test(content) && !evidence.includes(".env.example")) {

@@ -47,6 +47,9 @@ describe("shell completion", () => {
     expect(completionCandidates(["create", "--provider", "az"], scenarios)).toEqual([
       expect.objectContaining({ value: "azure-openai" }),
     ]);
+    expect(completionCandidates(["bootstrap", "--azure-setup", "pro"], scenarios)).toEqual([
+      expect.objectContaining({ value: "provision" }),
+    ]);
     expect(completionCandidates(["create", "--storage="], scenarios)).toEqual([
       expect.objectContaining({ value: "--storage=in-memory" }),
       expect.objectContaining({ value: "--storage=cosmos" }),
@@ -60,5 +63,10 @@ describe("shell completion", () => {
     expect(completionScript("powershell")).toMatch(/Register-ArgumentCompleter/);
     expect(completionScript("bash")).toMatch(/complete -F/);
     expect(completionScript("zsh")).toMatch(/compdef/);
+    expect(completionScript("clink", scenarios)).toMatch(/clink\.argmatcher\("create-cosmos-agent"\)/);
+    expect(completionScript("clink", scenarios)).toMatch(/rag-agent-ts/);
+    expect(completionScript("clink", scenarios)).toMatch(/--provider/);
+    expect(completionScript("clink", scenarios)).toMatch(/--azure-setup/);
+    expect(completionScript("clink", scenarios)).toMatch(/provision/);
   });
 });

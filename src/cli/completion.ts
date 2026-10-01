@@ -1,6 +1,6 @@
 import type { Scenario } from "../generator/manifest.js";
 
-export type CompletionShell = "powershell" | "bash" | "zsh";
+export type CompletionShell = "powershell" | "bash" | "zsh" | "clink";
 
 export interface CompletionCandidate {
   value: string;
@@ -35,6 +35,15 @@ const flags: CompletionCandidate[] = [
   { value: "--no-link", description: "Skip local project context" },
   { value: "--environment", description: "Azure environment name" },
   { value: "--deploy", description: "Provision and deploy with Azure Developer CLI" },
+  { value: "--azure-setup", description: "Configure existing Azure resources, provision, or defer" },
+  { value: "--azure-location", description: "Azure provisioning region" },
+  { value: "--azure-openai-endpoint", description: "Existing Azure OpenAI endpoint" },
+  { value: "--azure-openai-deployment", description: "Existing Azure OpenAI chat deployment" },
+  { value: "--cosmos-endpoint", description: "Existing Azure Cosmos DB endpoint" },
+  { value: "--entra-tenant-id", description: "Microsoft Entra tenant ID" },
+  { value: "--entra-audience", description: "Microsoft Entra API audience" },
+  { value: "--entra-client-id", description: "Microsoft Entra SPA client ID" },
+  { value: "--entra-scope", description: "Microsoft Entra API scope" },
   { value: "--yes", description: "Accept defaults without prompting" },
   { value: "--force", description: "Overlay a non-empty destination" },
   { value: "--dry-run", description: "Print the generation plan" },
@@ -66,10 +75,16 @@ const valuesByFlag: Record<string, CompletionCandidate[]> = {
     { value: "serverless", description: "Pay-per-request serverless capacity" },
     { value: "autoscale", description: "Autoscale provisioned throughput" },
   ],
+  "--azure-setup": [
+    { value: "later", description: "Configure Azure resources later" },
+    { value: "existing", description: "Use existing live Azure resources" },
+    { value: "provision", description: "Provision supported infrastructure with azd" },
+  ],
   completion: [
     { value: "powershell", description: "PowerShell native argument completer" },
     { value: "bash", description: "Bash completion function" },
     { value: "zsh", description: "Zsh completion function" },
+    { value: "clink", description: "Clink completion for Windows Command Prompt" },
   ],
 };
 
@@ -117,7 +132,85 @@ export function formatCompletionCandidates(candidates: CompletionCandidate[]): s
   return candidates.map((candidate) => `${candidate.value}\t${candidate.description}`).join("\n");
 }
 
-export function completionScript(shell: CompletionShell): string {
+function luaList(candidates: CompletionCandidate[]): string {
+  return `{ ${candidates.map((candidate) => JSON.stringify(candidate.value)).join(", ")} }`;
+}
+
+function luaDescriptions(candidates: CompletionCandidate[]): string {
+  return `{\n${candidates.map((candidate) =>
+    `  [${JSON.stringify(candidate.value)}] = ${JSON.stringify(candidate.description)},`
+  ).join("\n")}\n}`;
+}
+
+function clinkCompletionScript(scenarios: Scenario[]): string {
+  const templates = scenarios.map((scenario) => ({
+    value: scenario.id,
+    description: scenario.description,
+  }));
+  const flagDescriptions = luaDescriptions(flags);
+  const commandDescriptions = luaDescriptions(commands);
+  return `local template_values = ${luaList(templates)}
+local provider_values = ${luaList(valuesByFlag["--provider"]!)}
+local auth_values = ${luaList(valuesByFlag["--auth"]!)}
+local storage_values = ${luaList(valuesByFlag["--storage"]!)}
+local local_values = ${luaList(valuesByFlag["--local"]!)}
+local capacity_values = ${luaList(valuesByFlag["--capacity"]!)}
+local azure_setup_values = ${luaList(valuesByFlag["--azure-setup"]!)}
+local completion_values = ${luaList(valuesByFlag.completion!)}
+
+local flag_descriptions = ${flagDescriptions}
+local command_descriptions = ${commandDescriptions}
+
+local function value_matcher(values)
+  return clink.argmatcher():addarg(values):nofiles()
+end
+
+local function add_common_flags(matcher)
+  return matcher
+    :addflags({
+      "--template"..value_matcher(template_values),
+      "--provider"..value_matcher(provider_values),
+      "--auth"..value_matcher(auth_values),
+      "--storage"..value_matcher(storage_values),
+      "--local"..value_matcher(local_values),
+      "--capacity"..value_matcher(capacity_values),
+      "--azure-setup"..value_matcher(azure_setup_values),
+      "--web", "--no-web", "--git", "--no-git",
+      "--install", "--no-install", "--link", "--no-link",
+      "--environment", "--deploy", "--azure-location",
+      "--azure-openai-endpoint", "--azure-openai-deployment", "--cosmos-endpoint",
+      "--entra-tenant-id", "--entra-audience", "--entra-client-id", "--entra-scope",
+      "--yes", "--force",
+      "--dry-run", "--json", "--help", "--version",
+    })
+    :adddescriptions(flag_descriptions)
+end
+
+local function scaffold_matcher()
+  return add_common_flags(clink.argmatcher():addarg(clink.dirmatches))
+end
+
+local project_matcher = clink.argmatcher():addarg(clink.dirmatches)
+  :addflags("--environment", "--json", "--help")
+local completion_matcher = clink.argmatcher():addarg(completion_values):nofiles()
+local no_args_matcher = clink.argmatcher():addflags("--json", "--help"):nofiles()
+
+add_common_flags(clink.argmatcher("create-cosmos-agent")
+  :addarg({
+    "wizard"..scaffold_matcher(),
+    "create"..scaffold_matcher(),
+    "bootstrap"..scaffold_matcher(),
+    "list"..no_args_matcher,
+    "doctor"..project_matcher,
+    "prepare-azure"..project_matcher,
+    "validate"..project_matcher,
+    "completion"..completion_matcher,
+  })
+  :adddescriptions(command_descriptions))`;
+}
+
+export function completionScript(shell: CompletionShell, scenarios: Scenario[] = []): string {
+  if (shell === "clink") return clinkCompletionScript(scenarios);
   if (shell === "powershell") {
     return `Register-ArgumentCompleter -Native -CommandName create-cosmos-agent -ScriptBlock {
   param($wordToComplete, $commandAst, $cursorPosition)

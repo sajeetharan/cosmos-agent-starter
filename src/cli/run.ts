@@ -43,10 +43,10 @@ export async function runCli(args: string[]): Promise<number> {
   try {
     if (args[0] === "completion") {
       const shell = args[1];
-      if (shell !== "powershell" && shell !== "bash" && shell !== "zsh") {
-        throw new Error("The completion command requires powershell, bash, or zsh.");
+      if (shell !== "powershell" && shell !== "bash" && shell !== "zsh" && shell !== "clink") {
+        throw new Error("The completion command requires powershell, bash, zsh, or clink.");
       }
-      console.log(completionScript(shell as CompletionShell));
+      console.log(completionScript(shell as CompletionShell, await listScenarios()));
       return 0;
     }
     if (args[0] === "__complete") {
@@ -149,7 +149,16 @@ export async function runCli(args: string[]): Promise<number> {
           installDependencies: options.installDependencies,
           linkProject: options.linkProject,
           deploy: options.deploy,
+          azureSetup: options.azureSetup,
           ...(options.environmentName ? { environmentName: options.environmentName } : {}),
+          ...(options.azureLocation ? { azureLocation: options.azureLocation } : {}),
+          ...(options.azureOpenAIEndpoint ? {
+            azureOpenAIEndpoint: options.azureOpenAIEndpoint,
+          } : {}),
+          ...(options.azureOpenAIChatDeployment ? {
+            azureOpenAIChatDeployment: options.azureOpenAIChatDeployment,
+          } : {}),
+          ...(options.cosmosEndpoint ? { cosmosEndpoint: options.cosmosEndpoint } : {}),
           force: options.force,
         },
       };
@@ -161,7 +170,13 @@ export async function runCli(args: string[]): Promise<number> {
       }
       return 0;
     }
+    if (!options.json) {
+      console.log(`\n${statusTag("info")} Generating project files...`);
+    }
     const created = await composeProject(options);
+    if (!options.json) {
+      console.log(`${statusTag("success")} Project files generated`);
+    }
     const includeWeb = scenario.capabilities.includes("react-web") && options.includeWeb;
     if (options.command === "bootstrap") {
       const result = await bootstrapProject({
@@ -173,6 +188,21 @@ export async function runCli(args: string[]): Promise<number> {
         deploy: options.deploy,
         ...(options.environmentName ? { environmentName: options.environmentName } : {}),
         silent: options.json,
+        onProgress: ({ status, message }) => {
+          console.log(`${statusTag(status === "completed" ? "success" : "info")} ${message}`);
+        },
+        ...(options.azureSetup === "provision" ? {
+          azureProvisioning: {
+            location: options.azureLocation!,
+            provider: "azure-openai" as const,
+            azureOpenAIEndpoint: options.azureOpenAIEndpoint!,
+            azureOpenAIChatDeployment: options.azureOpenAIChatDeployment!,
+            entraTenantId: options.entraTenantId!,
+            entraAudience: options.entraAudience!,
+            entraClientId: options.entraClientId!,
+            entraScope: options.entraScope!,
+          },
+        } : {}),
       });
       if (options.json) {
         writeJson({
@@ -223,7 +253,15 @@ export async function runCli(args: string[]): Promise<number> {
       }
       return 0;
     }
-    if (options.initializeGit) await execFileAsync("git", ["init"], { cwd: created });
+    if (options.initializeGit) {
+      if (!options.json) {
+        console.log(`${statusTag("info")} Initializing Git repository...`);
+      }
+      await execFileAsync("git", ["init"], { cwd: created });
+      if (!options.json) {
+        console.log(`${statusTag("success")} Git repository initialized`);
+      }
+    }
     if (options.json) {
       writeJson({
         command: "create",

@@ -111,6 +111,52 @@ describe("CLI arguments", () => {
     });
   });
 
+  it("configures existing or provisioned Azure resources", () => {
+    expect(parseArguments([
+      "bootstrap",
+      "demo",
+      "--provider",
+      "azure-openai",
+      "--azure-setup",
+      "existing",
+      "--azure-openai-endpoint",
+      "https://sample.openai.azure.com",
+      "--azure-openai-deployment",
+      "chat",
+      "--cosmos-endpoint",
+      "https://sample.documents.azure.com:443/",
+      "--yes",
+    ])).toMatchObject({
+      azureSetup: "existing",
+      azureOpenAIEndpoint: "https://sample.openai.azure.com",
+      azureOpenAIChatDeployment: "chat",
+      cosmosEndpoint: "https://sample.documents.azure.com:443/",
+    });
+    expect(parseArguments([
+      "bootstrap",
+      "demo",
+      "--azure-setup",
+      "provision",
+      "--provider",
+      "azure-openai",
+      "--azure-location",
+      "eastus2",
+      "--azure-openai-endpoint",
+      "https://sample.openai.azure.com",
+      "--azure-openai-deployment",
+      "chat",
+      "--entra-tenant-id",
+      "tenant",
+      "--entra-audience",
+      "api://demo",
+      "--entra-client-id",
+      "client",
+      "--entra-scope",
+      "api://demo/access_as_user",
+      "--yes",
+    ])).toMatchObject({ azureSetup: "provision", deploy: true });
+  });
+
   it("rejects invalid provider, authentication, and storage options", () => {
     expect(() => parseArguments(["demo", "--provider", "invalid"])).toThrow(/provider/i);
     expect(() => parseArguments(["demo", "--auth", "invalid"])).toThrow(/authentication/i);
@@ -132,6 +178,22 @@ describe("CLI arguments", () => {
       .toThrow(/cannot be combined/i);
     expect(() => parseArguments(["bootstrap", "demo", "--environment", "dev", "--no-link"]))
       .toThrow(/cannot be combined/i);
+    expect(() => parseArguments(["demo", "--azure-setup", "provision"]))
+      .toThrow(/only valid with bootstrap/i);
+    expect(() => parseArguments([
+      "bootstrap", "demo", "--azure-setup", "provision", "--no-link",
+    ])).toThrow(/cannot be combined/i);
+    expect(() => parseArguments([
+      "bootstrap", "demo", "--azure-setup", "provision", "--provider", "mock",
+    ])).toThrow(/requires --provider azure-openai/i);
+    expect(() => parseArguments([
+      "bootstrap", "demo", "--azure-setup", "provision", "--provider", "azure-openai", "--yes",
+    ])).toThrow(/requires: --azure-location/i);
+    expect(() => parseArguments([
+      "bootstrap", "demo", "--provider", "azure-openai", "--azure-setup", "existing",
+    ])).toThrow(/requires --azure-openai-endpoint/i);
+    expect(() => parseArguments(["demo", "--cosmos-endpoint", "http://example.com"]))
+      .toThrow(/HTTPS URL/i);
   });
 
   it("requires JSON creation to be noninteractive", () => {

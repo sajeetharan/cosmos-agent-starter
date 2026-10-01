@@ -3,6 +3,7 @@ export type LocalMode = "emulator" | "azure";
 export type AIProvider = "mock" | "azure-openai" | "openai" | "ollama";
 export type AuthMode = "local" | "entra";
 export type StorageBackend = "in-memory" | "cosmos";
+export type AzureSetup = "later" | "existing" | "provision";
 export type CliCommand =
   | "create"
   | "bootstrap"
@@ -29,13 +30,22 @@ export interface CliOptions {
   linkProject: boolean;
   deploy: boolean;
   environmentName?: string;
+  azureSetup: AzureSetup;
+  azureLocation?: string;
+  azureOpenAIEndpoint?: string;
+  azureOpenAIChatDeployment?: string;
+  cosmosEndpoint?: string;
+  entraTenantId?: string;
+  entraAudience?: string;
+  entraClientId?: string;
+  entraScope?: string;
   yes: boolean;
   force: boolean;
   dryRun: boolean;
   json: boolean;
 }
 
-const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "projectDirectory" | "provider" | "authMode" | "storage" | "environmentName">([
+const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "projectDirectory" | "provider" | "authMode" | "storage" | "environmentName" | "azureSetup" | "azureLocation" | "azureOpenAIEndpoint" | "azureOpenAIChatDeployment" | "cosmosEndpoint" | "entraTenantId" | "entraAudience" | "entraClientId" | "entraScope">([
   ["--template", "template"],
   ["-t", "template"],
   ["--capacity", "capacity"],
@@ -47,6 +57,15 @@ const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "proj
   ["-C", "projectDirectory"],
   ["--environment", "environmentName"],
   ["-e", "environmentName"],
+  ["--azure-setup", "azureSetup"],
+  ["--azure-location", "azureLocation"],
+  ["--azure-openai-endpoint", "azureOpenAIEndpoint"],
+  ["--azure-openai-deployment", "azureOpenAIChatDeployment"],
+  ["--cosmos-endpoint", "cosmosEndpoint"],
+  ["--entra-tenant-id", "entraTenantId"],
+  ["--entra-audience", "entraAudience"],
+  ["--entra-client-id", "entraClientId"],
+  ["--entra-scope", "entraScope"],
 ] as const);
 
 const booleanFlags = new Set([
@@ -108,6 +127,15 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   let linkProject = explicitCommand === "bootstrap";
   let deploy = false;
   let environmentName: string | undefined;
+  let azureSetup: string = "later";
+  let azureLocation: string | undefined;
+  let azureOpenAIEndpoint: string | undefined;
+  let azureOpenAIChatDeployment: string | undefined;
+  let cosmosEndpoint: string | undefined;
+  let entraTenantId: string | undefined;
+  let entraAudience: string | undefined;
+  let entraClientId: string | undefined;
+  let entraScope: string | undefined;
   let yes = false;
   let force = false;
   let dryRun = false;
@@ -129,6 +157,15 @@ export function parseArguments(rawArgs: string[]): CliOptions {
       if (valueKey === "storage") storage = value;
       if (valueKey === "projectDirectory") projectDirectory = value;
       if (valueKey === "environmentName") environmentName = value;
+      if (valueKey === "azureSetup") azureSetup = value;
+      if (valueKey === "azureLocation") azureLocation = value;
+      if (valueKey === "azureOpenAIEndpoint") azureOpenAIEndpoint = value;
+      if (valueKey === "azureOpenAIChatDeployment") azureOpenAIChatDeployment = value;
+      if (valueKey === "cosmosEndpoint") cosmosEndpoint = value;
+      if (valueKey === "entraTenantId") entraTenantId = value;
+      if (valueKey === "entraAudience") entraAudience = value;
+      if (valueKey === "entraClientId") entraClientId = value;
+      if (valueKey === "entraScope") entraScope = value;
       index += 1;
       continue;
     }
@@ -226,6 +263,23 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   if (storage !== "in-memory" && storage !== "cosmos") {
     throw new Error(`Unsupported storage backend "${storage}". Use in-memory or cosmos.`);
   }
+  if (!(["later", "existing", "provision"] as const).includes(azureSetup as AzureSetup)) {
+    throw new Error(
+      `Unsupported Azure setup mode "${azureSetup}". Use later, existing, or provision.`,
+    );
+  }
+  for (const [name, value] of [
+    ["Azure OpenAI endpoint", azureOpenAIEndpoint],
+    ["Cosmos DB endpoint", cosmosEndpoint],
+  ] as const) {
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" && url.hostname !== "localhost") throw new Error();
+    } catch {
+      throw new Error(`${name} must be an HTTPS URL.`);
+    }
+  }
   if (force && dryRun) {
     throw new Error("--force and --dry-run cannot be used together.");
   }
@@ -241,6 +295,15 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     "--provider",
     "--auth",
     "--storage",
+    "--azure-setup",
+    "--azure-location",
+    "--azure-openai-endpoint",
+    "--azure-openai-deployment",
+    "--cosmos-endpoint",
+    "--entra-tenant-id",
+    "--entra-audience",
+    "--entra-client-id",
+    "--entra-scope",
     "--web",
     "--no-web",
     "--git",
@@ -277,8 +340,38 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   ) {
     throw new Error("Install, link, environment, and deploy options are only valid with bootstrap.");
   }
+  if (azureSetup === "provision" && command !== "bootstrap") {
+    throw new Error('--azure-setup provision is only valid with bootstrap.');
+  }
+  if (azureSetup === "provision") deploy = true;
   if (deploy && !linkProject) {
     throw new Error("--deploy cannot be combined with --no-link.");
+  }
+  if (azureSetup === "provision" && provider !== "azure-openai") {
+    throw new Error("Azure provisioning requires --provider azure-openai.");
+  }
+  if (azureSetup === "provision" && yes) {
+    const requiredProvisioningValues = [
+      ["--azure-location", azureLocation],
+      ["--azure-openai-endpoint", azureOpenAIEndpoint],
+      ["--azure-openai-deployment", azureOpenAIChatDeployment],
+      ["--entra-tenant-id", entraTenantId],
+      ["--entra-audience", entraAudience],
+      ["--entra-client-id", entraClientId],
+      ["--entra-scope", entraScope],
+    ] as const;
+    const missing = requiredProvisioningValues
+      .filter(([, value]) => !value?.trim())
+      .map(([flag]) => flag);
+    if (missing.length > 0) {
+      throw new Error(`Noninteractive Azure provisioning requires: ${missing.join(", ")}.`);
+    }
+  }
+  if (azureSetup === "existing" && provider === "azure-openai" &&
+    (!azureOpenAIEndpoint || !azureOpenAIChatDeployment)) {
+    throw new Error(
+      "Existing Azure OpenAI setup requires --azure-openai-endpoint and --azure-openai-deployment.",
+    );
   }
   if (command === "bootstrap" && environmentName && !linkProject) {
     throw new Error("--environment cannot be combined with --no-link.");
@@ -306,6 +399,15 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     linkProject,
     deploy,
     ...(environmentName ? { environmentName } : {}),
+    azureSetup: azureSetup as AzureSetup,
+    ...(azureLocation ? { azureLocation } : {}),
+    ...(azureOpenAIEndpoint ? { azureOpenAIEndpoint } : {}),
+    ...(azureOpenAIChatDeployment ? { azureOpenAIChatDeployment } : {}),
+    ...(cosmosEndpoint ? { cosmosEndpoint } : {}),
+    ...(entraTenantId ? { entraTenantId } : {}),
+    ...(entraAudience ? { entraAudience } : {}),
+    ...(entraClientId ? { entraClientId } : {}),
+    ...(entraScope ? { entraScope } : {}),
     yes,
     force,
     dryRun,

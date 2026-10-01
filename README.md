@@ -224,9 +224,30 @@ Generated production foundations include:
 | `create-cosmos-agent doctor <project>` | Inspect configuration and security patterns |
 | `create-cosmos-agent prepare-azure <project>` | Check azd, Entra, provider, RBAC, region, and capacity readiness |
 | `create-cosmos-agent validate <project>` | Validate generated files, builds, tests, and Bicep |
-| `create-cosmos-agent completion <shell>` | Enable PowerShell, Bash, or Zsh completion |
+| `create-cosmos-agent completion <shell>` | Enable PowerShell, Bash, Zsh, or Clink completion |
 
 Run `npx create-cosmos-agent@latest --help` for every option.
+
+### Command Prompt Tab completion
+
+[Clink](https://chrisant996.github.io/clink/) adds command and argument completion to Windows
+Command Prompt. Install and configure it once:
+
+```cmd
+winget install --id chrisant996.Clink -e
+```
+
+Open a new Command Prompt, then run:
+
+```cmd
+mkdir "%LOCALAPPDATA%\create-cosmos-agent\clink"
+create-cosmos-agent completion clink > "%LOCALAPPDATA%\create-cosmos-agent\clink\create-cosmos-agent.lua"
+clink installscripts "%LOCALAPPDATA%\create-cosmos-agent\clink"
+clink autorun install
+```
+
+Open a new Command Prompt. `Tab` now completes commands, options, templates, and option values;
+`Ctrl+Space` opens Clink's interactive completion list.
 
 ## Validate a generated project
 
@@ -239,8 +260,15 @@ npm run build
 ## Move from local to Azure
 
 The generated application contracts stay the same when moving to Azure, but production intentionally
-requires verified identity and a real model deployment. Create an `azd` environment, configure it,
-and use the readiness check before provisioning:
+requires verified identity and a real model deployment. Guided bootstrap asks whether to use existing
+Azure resources, provision supported application infrastructure with `azd`, or configure Azure later.
+Existing-resource mode writes supplied Azure OpenAI and Cosmos DB endpoints into the generated `.env`.
+Provisioning mode requires a second confirmation because it can create billable Cosmos DB, Container
+Apps, managed identity, and monitoring resources.
+
+Azure OpenAI model capacity remains bring-your-own: guided setup asks for an existing endpoint and
+deployment name because regional model availability and quota cannot be inferred safely. For manual
+setup, create an `azd` environment, configure it, and use the readiness check before provisioning:
 
 ```powershell
 azd auth login
@@ -269,7 +297,7 @@ If your corporate npm proxy has not mirrored the latest release, download the `.
 [GitHub Releases](https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/releases) and run:
 
 ```powershell
-npx --yes --package .\create-cosmos-agent-0.5.1.tgz create-cosmos-agent my-agent --yes
+npx --yes --package .\create-cosmos-agent-0.5.2.tgz create-cosmos-agent my-agent --yes
 ```
 
 ## Develop the CLI

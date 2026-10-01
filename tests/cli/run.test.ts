@@ -23,6 +23,14 @@ describe("CLI execution", () => {
     expect(log).toHaveBeenCalledWith(packageJson.version);
   });
 
+  it("prints Clink completion setup", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(runCli(["completion", "clink"])).resolves.toBe(0);
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(
+      /clink\.argmatcher\("create-cosmos-agent"\)/,
+    ));
+  });
+
   it("emits a JSON dry-run plan without writing files", async () => {
     const parent = await mkdtemp(join(tmpdir(), "cosmos-cli-dry-"));
     created.push(parent);
@@ -86,5 +94,26 @@ describe("CLI execution", () => {
       environmentName: "test-dev",
       deploymentStatus: "local",
     });
+  });
+
+  it("shows progress while bootstrapping interactively", async () => {
+    const destination = await mkdtemp(join(tmpdir(), "cosmos-cli-progress-"));
+    created.push(destination);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await expect(runCli([
+      "bootstrap",
+      destination,
+      "--yes",
+      "--force",
+      "--no-install",
+      "--no-git",
+      "--environment",
+      "progress-dev",
+    ])).resolves.toBe(0);
+    const output = log.mock.calls.flat().join("\n");
+    expect(output).toContain("[info] Generating project files...");
+    expect(output).toContain("[done] Project files generated");
+    expect(output).toContain("[info] Linking local project context...");
+    expect(output).toContain("[done] Project context linked to progress-dev");
   });
 });

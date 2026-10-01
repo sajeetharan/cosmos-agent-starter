@@ -6,6 +6,8 @@ import type { ProjectManifest, Scenario } from "./manifest.js";
 import { assertSafeDestination, validateGeneratedFiles } from "./validation.js";
 
 const sourceRoot = join(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".."), "src");
+const emulatorKey =
+  "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
 async function copyTemplate(source: string, destination: string): Promise<void> {
   await cp(source, destination, { recursive: true, force: true });
@@ -26,11 +28,13 @@ async function renameDotfiles(directory: string): Promise<void> {
 
 async function replaceTokens(directory: string, tokens: Record<string, string>): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name === ".git" || entry.isSymbolicLink()) continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) {
       await replaceTokens(path, tokens);
       continue;
     }
+    if (!entry.isFile()) continue;
     const content = await readFile(path, "utf8");
     let next = content;
     for (const [token, value] of Object.entries(tokens)) {
@@ -92,6 +96,70 @@ async function configureWebOption(destination: string, includeWeb: boolean): Pro
   }
 }
 
+function setEnvironmentValue(content: string, name: string, value: string): string {
+  const pattern = new RegExp(`^${name}=.*$`, "m");
+  if (!pattern.test(content)) {
+    throw new Error(`Generated environment is missing ${name}.`);
+  }
+  return content.replace(pattern, `${name}=${value}`);
+}
+
+async function configureLocalDevelopment(
+  destination: string,
+  options: CliOptions,
+): Promise<void> {
+  const usesEmulator = options.storage === "cosmos" && options.localMode === "emulator";
+  const hasLiveConfiguration = options.azureSetup !== "later" && Boolean(
+    options.azureOpenAIEndpoint || options.cosmosEndpoint,
+  );
+  if (!usesEmulator && !hasLiveConfiguration) return;
+
+  if (usesEmulator) {
+    const packagePath = join(destination, "package.json");
+    const packageJson = JSON.parse(await readFile(packagePath, "utf8")) as {
+      scripts?: Record<string, string>;
+    };
+    const applicationDevCommand = packageJson.scripts?.dev;
+    if (!applicationDevCommand) {
+      throw new Error("Generated package is missing the dev script.");
+    }
+    packageJson.scripts = {
+      ...packageJson.scripts,
+      "dev:app": applicationDevCommand,
+      "emulator:start": "docker compose up -d --wait",
+      "emulator:stop": "docker compose down",
+      predev: "npm run emulator:start && npm run emulator:init",
+    };
+    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+  }
+
+  const environmentExample = await readFile(join(destination, ".env.example"), "utf8");
+  let environment = environmentExample;
+  if (usesEmulator) {
+    environment = setEnvironmentValue(environment, "COSMOS_EMULATOR_KEY", emulatorKey);
+  }
+  if (options.azureOpenAIEndpoint) {
+    environment = setEnvironmentValue(
+      environment,
+      "AZURE_OPENAI_ENDPOINT",
+      options.azureOpenAIEndpoint,
+    );
+  }
+  if (options.azureOpenAIChatDeployment) {
+    environment = setEnvironmentValue(
+      environment,
+      "AZURE_OPENAI_CHAT_DEPLOYMENT",
+      options.azureOpenAIChatDeployment,
+    );
+  }
+  if (options.cosmosEndpoint) {
+    environment = setEnvironmentValue(environment, "COSMOS_ENDPOINT", options.cosmosEndpoint);
+    environment = setEnvironmentValue(environment, "COSMOS_EMULATOR", "false");
+    environment = setEnvironmentValue(environment, "COSMOS_EMULATOR_KEY", "");
+  }
+  await writeFile(join(destination, ".env"), environment);
+}
+
 export async function composeProject(options: CliOptions): Promise<string> {
   if (!options.destination) throw new Error("A destination is required.");
   const destination = resolve(options.destination);
@@ -139,6 +207,7 @@ export async function composeProject(options: CliOptions): Promise<string> {
     destination,
     scenario.capabilities.includes("react-web") && options.includeWeb,
   );
+  await configureLocalDevelopment(destination, options);
   await validateGeneratedFiles(destination);
   return destination;
 }
