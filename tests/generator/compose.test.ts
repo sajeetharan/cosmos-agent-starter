@@ -48,10 +48,17 @@ describe("scenario composition", () => {
     expect(await readFile(join(first, ".github", "copilot-instructions.md"), "utf8")).toMatch(/DefaultAzureCredential/);
     expect(await readFile(join(first, "docs", "architecture.md"), "utf8"))
       .toMatch(/Conversation store[\s\S]*Durable memory store/);
-    expect(await readFile(join(first, "scripts", "init-emulator.ts"), "utf8"))
+    const emulatorSource = await readFile(join(first, "scripts", "init-emulator.ts"), "utf8");
+    expect(emulatorSource)
       .toMatch(/conversation-history[\s\S]*agent-memory[\s\S]*vectorEmbeddingPolicy/);
-    expect(await readFile(join(first, "scripts", "init-emulator.ts"), "utf8"))
-      .not.toContain("vectorIndexes");
+    expect(emulatorSource).not.toContain("vectorIndexes");
+    expect(emulatorSource).toContain('userAgentSuffix: USER_AGENT_SUFFIX');
+    const cosmosClientSource = await readFile(
+      join(first, "packages", "memory", "src", "cosmos-client.ts"),
+      "utf8",
+    );
+    expect(cosmosClientSource).toContain('const USER_AGENT_SUFFIX = "cosmos-agent-starter"');
+    expect(cosmosClientSource.match(/userAgentSuffix: USER_AGENT_SUFFIX/g)).toHaveLength(2);
     expect(await readFile(join(first, "tests", "scenarios", "multi-tenant.test.ts"), "utf8"))
       .toMatch(/isolates conversation, durable memory, deletion, and approval flows/);
     expect(await readFile(join(first, "infra", "modules", "cosmos.bicep"), "utf8"))

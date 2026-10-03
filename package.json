@@ -1,6 +1,6 @@
 {
   "name": "create-cosmos-agent",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Scaffold customer-ready AI agents with Cosmos DB, React, Entra ID, RAG, and multi-provider models",
   "keywords": [
     "azure",
@@ -17,11 +17,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AzureCosmosDB/azure-cosmos-agent-starter.git"
+    "url": "git+https://github.com/sajeetharan/cosmos-agent-starter.git"
   },
-  "homepage": "https://github.com/AzureCosmosDB/azure-cosmos-agent-starter#readme",
+  "homepage": "https://github.com/sajeetharan/cosmos-agent-starter#readme",
   "bugs": {
-    "url": "https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/issues"
+    "url": "https://github.com/sajeetharan/cosmos-agent-starter/issues"
   },
   "type": "module",
   "bin": {

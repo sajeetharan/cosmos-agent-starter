@@ -77,6 +77,18 @@ Do not enable continuous integration or scheduled triggers.
 7. Wait for `EsrpRelease@12` to complete.
 8. Run the GitHub **Verify npm package** workflow with the published version.
 
+## Publishing to GitHub Packages
+
+The npmjs.com package remains unscoped as `create-cosmos-agent`. To make a release visible in this
+repository's **Packages** section, manually run the GitHub **Publish GitHub package** workflow from
+the default branch after the npm release completes, and enter the matching immutable release tag.
+
+The workflow validates the package, temporarily scopes its name as
+`@sajeetharan/create-cosmos-agent`, and publishes it to GitHub Packages with the repository's
+`GITHUB_TOKEN`. It fails if the package version does not match the selected `v<version>` tag. It
+does not modify the checked-in package name or replace the npmjs.com release. Each package version
+can be published to GitHub Packages only once.
+
 The pipeline fails closed unless:
 
 - it runs from `main`;

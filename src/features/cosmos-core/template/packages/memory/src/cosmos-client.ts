@@ -1,6 +1,8 @@
 import { ConnectionMode, CosmosClient } from "@azure/cosmos";
 import { DefaultAzureCredential } from "@azure/identity";
 
+const USER_AGENT_SUFFIX = "cosmos-agent-starter";
+
 let singleton: CosmosClient | undefined;
 
 export function getCosmosClient(): CosmosClient {
@@ -14,12 +16,13 @@ export function getCosmosClient(): CosmosClient {
       endpoint,
       key,
       connectionPolicy: { connectionMode: ConnectionMode.Gateway },
+      userAgentSuffix: USER_AGENT_SUFFIX,
     });
   } else {
     singleton = new CosmosClient({
       endpoint,
       aadCredentials: new DefaultAzureCredential(),
-      userAgentSuffix: "cosmos-agent-starter",
+      userAgentSuffix: USER_AGENT_SUFFIX,
     });
   }
   return singleton;

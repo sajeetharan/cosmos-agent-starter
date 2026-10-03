@@ -8,6 +8,8 @@ import {
   VectorEmbeddingDistanceFunction,
 } from "@azure/cosmos";
 
+const USER_AGENT_SUFFIX = "cosmos-agent-starter";
+
 if (process.env.COSMOS_EMULATOR !== "true") {
   throw new Error("Emulator initialization requires COSMOS_EMULATOR=true.");
 }
@@ -22,6 +24,7 @@ const client = new CosmosClient({
   endpoint,
   key,
   connectionPolicy: { connectionMode: ConnectionMode.Gateway },
+  userAgentSuffix: USER_AGENT_SUFFIX,
 });
 const { database } = await client.databases.createIfNotExists({ id: databaseId });
 await database.containers.createIfNotExists({
