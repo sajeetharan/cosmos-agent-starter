@@ -54,4 +54,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           npm pkg set name="@sajeetharan/create-cosmos-agent"
-          npm publish --access public --registry=https://npm.pkg.github.com
+          npm publish --ignore-scripts --access public --registry=https://npm.pkg.github.com
