@@ -17,12 +17,12 @@ Build production-oriented TypeScript AI agents with a guided CLI and an Azure Co
 [![npm version](https://img.shields.io/npm/v/create-cosmos-agent?logo=npm&color=CB3837)](https://www.npmjs.com/package/create-cosmos-agent)
 [![npm downloads](https://img.shields.io/npm/dm/create-cosmos-agent?logo=npm)](https://www.npmjs.com/package/create-cosmos-agent)
 [![Node.js](https://img.shields.io/node/v/create-cosmos-agent?logo=node.js)](https://www.npmjs.com/package/create-cosmos-agent)
-[![GitHub stars](https://img.shields.io/github/stars/AzureCosmosDB/azure-cosmos-agent-starter?logo=github)](https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/stargazers)
-[![License](https://img.shields.io/github/license/AzureCosmosDB/azure-cosmos-agent-starter)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/sajeetharan/cosmos-agent-starter?logo=github)](https://github.com/sajeetharan/cosmos-agent-starter/stargazers)
+[![License](https://img.shields.io/github/license/sajeetharan/cosmos-agent-starter)](LICENSE)
 
 [npm package](https://www.npmjs.com/package/create-cosmos-agent) ·
 [documentation](#quickstart) ·
-[report an issue](https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/issues) ·
+[report an issue](https://github.com/sajeetharan/cosmos-agent-starter/issues) ·
 [contribute](CONTRIBUTING.md)
 
 `create-cosmos-agent` generates a complete API and React application with memory, vector retrieval,
@@ -49,29 +49,29 @@ Follow the complete path from one-command bootstrap to a Cosmos DB emulator-back
 memory recall, diagnostics, validation, and an Azure deployment preview. The cloud section shows the
 commands and generated architecture without provisioning billable resources.
 
-[![End-to-end Cosmos Agent scenario](docs/media/create-cosmos-agent-end-to-end-preview.gif)](https://raw.githubusercontent.com/AzureCosmosDB/azure-cosmos-agent-starter/main/docs/media/create-cosmos-agent-end-to-end.mp4)
+[![End-to-end Cosmos Agent scenario](docs/media/create-cosmos-agent-end-to-end-preview.gif)](https://raw.githubusercontent.com/sajeetharan/cosmos-agent-starter/main/docs/media/create-cosmos-agent-end-to-end.mp4)
 
-[Watch the 2:44 end-to-end demo](https://raw.githubusercontent.com/AzureCosmosDB/azure-cosmos-agent-starter/main/docs/media/create-cosmos-agent-end-to-end.mp4) ·
+[Watch the 2:44 end-to-end demo](https://raw.githubusercontent.com/sajeetharan/cosmos-agent-starter/main/docs/media/create-cosmos-agent-end-to-end.mp4) ·
 [Download captions](docs/media/create-cosmos-agent-end-to-end.srt)
 
 ### Product overview
 
-[![create-cosmos-agent overview preview](docs/media/create-cosmos-agent-preview.gif)](https://raw.githubusercontent.com/AzureCosmosDB/azure-cosmos-agent-starter/main/docs/media/create-cosmos-agent-overview.mp4)
+[![create-cosmos-agent overview preview](docs/media/create-cosmos-agent-preview.gif)](https://raw.githubusercontent.com/sajeetharan/cosmos-agent-starter/main/docs/media/create-cosmos-agent-overview.mp4)
 
-[Watch the full overview video](https://raw.githubusercontent.com/AzureCosmosDB/azure-cosmos-agent-starter/main/docs/media/create-cosmos-agent-overview.mp4).
+[Watch the full overview video](https://raw.githubusercontent.com/sajeetharan/cosmos-agent-starter/main/docs/media/create-cosmos-agent-overview.mp4).
 
-## Quickstart
+## 60-second quickstart
 
 Requires Node.js 20 or later.
 
 ```powershell
-npx create-cosmos-agent@latest my-agent --yes
+npx create-cosmos-agent@latest bootstrap my-agent --yes
 cd my-agent
-npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Open `http://localhost:5173` and send your first message. The `bootstrap` command scaffolds the
+application, installs its dependencies, and initializes a local Git repository.
 
 The generated project starts with safe local defaults:
 
@@ -80,6 +80,44 @@ The generated project starts with safe local defaults:
 - in-memory storage.
 
 No Azure subscription, model key, database, or Docker installation is required for the first run.
+
+## Working starters
+
+Every starter is a runnable application with local defaults. Replace `<project-name>` and run one
+of these commands:
+
+| Use case                                      | Command                                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Full-stack conversational agent               | `npx create-cosmos-agent@latest bootstrap <project-name> --template chat-agent-ts --yes`       |
+| Document-grounded RAG with citations          | `npx create-cosmos-agent@latest bootstrap <project-name> --template rag-agent-ts --yes`        |
+| Customer support copilot and ticket workflows | `npx create-cosmos-agent@latest bootstrap <project-name> --template customer-support-ts --yes` |
+| Supervised multi-agent orchestration          | `npx create-cosmos-agent@latest bootstrap <project-name> --template multi-agent-ts --yes`      |
+| Durable, tenant-safe agent memory             | `npx create-cosmos-agent@latest bootstrap <project-name> --template agent-memory-ts --yes`     |
+| Event-driven Service Bus worker               | `npx create-cosmos-agent@latest bootstrap <project-name> --template event-agent-ts --yes`      |
+
+Then enter the generated directory and run `npm run dev`. Use
+`npx create-cosmos-agent@latest list` to inspect the available starters before generating one.
+
+## Adoption and showcase
+
+The badges at the top of this README report the live npm version, monthly npm downloads, and GitHub
+stars. The package is available from
+[npm](https://www.npmjs.com/package/create-cosmos-agent) and
+[GitHub Packages](https://github.com/sajeetharan/cosmos-agent-starter/pkgs/npm/create-cosmos-agent).
+The CLI does not collect telemetry; aggregate npm downloads are the project's only usage metric.
+
+Built something public with `create-cosmos-agent`?
+[Submit it to the project showcase](https://github.com/sajeetharan/cosmos-agent-starter/issues/new?template=showcase.yml)
+so maintainers can feature verified community projects here.
+
+## Learn by building
+
+- [Run the complete local tutorial](docs/try-it-yourself.md): generate an application, start the
+  Cosmos DB emulator, exercise durable tenant-safe memory, and run the quality gates.
+- [Watch the 2:44 end-to-end demo](https://raw.githubusercontent.com/sajeetharan/cosmos-agent-starter/main/docs/media/create-cosmos-agent-end-to-end.mp4):
+  follow the path from local bootstrap to an Azure deployment preview.
+- [Move from local to Azure](#move-from-local-to-azure): configure identity, an existing model
+  deployment, Cosmos DB capacity, and deployment readiness.
 
 ## Guided setup
 
@@ -152,14 +190,14 @@ stored in `.cosmos-agent/context.json` and excluded from Git.
 
 ## Templates
 
-| Template | Use case |
-|---|---|
-| `chat-agent-ts` | Conversational assistants with memory and safe actions |
-| `rag-agent-ts` | Grounded document Q&A with vector retrieval and citations |
-| `customer-support-ts` | Customer context, ticket workflows, and approvals |
-| `event-agent-ts` | Service Bus-triggered agents with idempotency, retries, and dead-lettering |
-| `multi-agent-ts` | Planner, specialist, and reviewer workflows |
-| `agent-memory-ts` | Lightweight tenant-safe memory and approval primitives |
+| Template              | Use case                                                                   |
+| --------------------- | -------------------------------------------------------------------------- |
+| `chat-agent-ts`       | Conversational assistants with memory and safe actions                     |
+| `rag-agent-ts`        | Grounded document Q&A with vector retrieval and citations                  |
+| `customer-support-ts` | Customer context, ticket workflows, and approvals                          |
+| `event-agent-ts`      | Service Bus-triggered agents with idempotency, retries, and dead-lettering |
+| `multi-agent-ts`      | Planner, specialist, and reviewer workflows                                |
+| `agent-memory-ts`     | Lightweight tenant-safe memory and approval primitives                     |
 
 Choose a template directly:
 
@@ -215,16 +253,16 @@ Generated production foundations include:
 
 ## Essential commands
 
-| Command | Purpose |
-|---|---|
-| `create-cosmos-agent wizard <name>` | Create a project with guided choices |
-| `create-cosmos-agent bootstrap <name>` | Scaffold, install, link, and optionally deploy |
-| `create-cosmos-agent <name> --yes` | Create with recommended defaults |
-| `create-cosmos-agent list` | List available templates |
-| `create-cosmos-agent doctor <project>` | Inspect configuration and security patterns |
+| Command                                       | Purpose                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| `create-cosmos-agent wizard <name>`           | Create a project with guided choices                             |
+| `create-cosmos-agent bootstrap <name>`        | Scaffold, install, link, and optionally deploy                   |
+| `create-cosmos-agent <name> --yes`            | Create with recommended defaults                                 |
+| `create-cosmos-agent list`                    | List available templates                                         |
+| `create-cosmos-agent doctor <project>`        | Inspect configuration and security patterns                      |
 | `create-cosmos-agent prepare-azure <project>` | Check azd, Entra, provider, RBAC, region, and capacity readiness |
-| `create-cosmos-agent validate <project>` | Validate generated files, builds, tests, and Bicep |
-| `create-cosmos-agent completion <shell>` | Enable PowerShell, Bash, Zsh, or Clink completion |
+| `create-cosmos-agent validate <project>`      | Validate generated files, builds, tests, and Bicep               |
+| `create-cosmos-agent completion <shell>`      | Enable PowerShell, Bash, Zsh, or Clink completion                |
 
 Run `npx create-cosmos-agent@latest --help` for every option.
 
@@ -294,24 +332,24 @@ resources.
 ## Corporate npm proxy fallback
 
 If your corporate npm proxy has not mirrored the latest release, download the `.tgz` package from
-[GitHub Releases](https://github.com/AzureCosmosDB/azure-cosmos-agent-starter/releases) and run:
+[GitHub Releases](https://github.com/sajeetharan/cosmos-agent-starter/releases) and run:
 
 ```powershell
-npx --yes --package .\create-cosmos-agent-0.5.2.tgz create-cosmos-agent my-agent --yes
+npx --yes --package .\create-cosmos-agent-0.5.3.tgz create-cosmos-agent my-agent --yes
 ```
 
 ## Develop the CLI
 
 ```powershell
-git clone https://github.com/AzureCosmosDB/azure-cosmos-agent-starter.git
+git clone https://github.com/sajeetharan/cosmos-agent-starter.git
 cd cosmos-agent-starter
 npm install
 npm run validate
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
-[SECURITY.md](SECURITY.md) for vulnerability reporting. Maintainers must publish npm releases
-through the [Microsoft ESRP release process](docs/releasing-npm.md).
+See the [changelog](CHANGELOG.md), [support guide](SUPPORT.md),
+[contribution guidance](CONTRIBUTING.md), and [security policy](SECURITY.md). Maintainers must
+publish npm releases through the [Microsoft ESRP release process](docs/releasing-npm.md).
 
 ## License
 

@@ -1,0 +1,53 @@
+name: Showcase a project
+description: Share a project built with create-cosmos-agent
+title: "[Showcase]: "
+labels:
+  - showcase
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for building with create-cosmos-agent. Share only public information that you have permission to publish.
+  - type: input
+    id: project-name
+    attributes:
+      label: Project name
+      placeholder: My customer support agent
+    validations:
+      required: true
+  - type: input
+    id: project-url
+    attributes:
+      label: Public project or demo URL
+      description: Link to a public repository, deployment, article, or video.
+      placeholder: https://github.com/example/project
+    validations:
+      required: true
+  - type: dropdown
+    id: template
+    attributes:
+      label: Starter
+      options:
+        - chat-agent-ts
+        - rag-agent-ts
+        - customer-support-ts
+        - multi-agent-ts
+        - agent-memory-ts
+        - event-agent-ts
+        - Custom or multiple starters
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: What did you build?
+      description: Describe the use case and how create-cosmos-agent helped.
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Showcase permission
+      options:
+        - label: The maintainers may link to this public project from repository documentation.
+          required: true

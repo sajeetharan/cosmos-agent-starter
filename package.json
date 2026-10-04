@@ -4,15 +4,22 @@
   "description": "Scaffold customer-ready AI agents with Cosmos DB, React, Entra ID, RAG, and multi-provider models",
   "keywords": [
     "azure",
+    "azure-ai",
     "cosmosdb",
+    "cosmos-db",
+    "ai",
+    "agent",
     "ai-agent",
     "azure-openai",
+    "openai",
+    "llm",
     "rag",
     "react",
     "multi-agent",
     "scaffolding",
     "cli",
     "typescript",
+    "typescript-starter",
     "vector-search"
   ],
   "repository": {

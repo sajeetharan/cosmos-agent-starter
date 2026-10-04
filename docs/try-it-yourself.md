@@ -14,17 +14,18 @@ deterministic, so no model credentials or Azure subscription are required.
 
 ## 1. Install the CLI
 
-Download the latest release package `create-cosmos-agent-0.5.2.tgz` from GitHub Releases:
+Download the latest release package `create-cosmos-agent-0.5.3.tgz` from GitHub Releases:
 
 ```cmd
 mkdir C:\Demos
 cd /d C:\Demos
-curl -LO https://github.com/sajeetharan/cosmos-agent-starter/releases/download/v0.5.2/create-cosmos-agent-0.5.2.tgz
-npm install --global create-cosmos-agent-0.5.2.tgz
+curl -LO https://github.com/sajeetharan/cosmos-agent-starter/releases/download/v0.5.3/create-cosmos-agent-0.5.3.tgz
+npm install --global create-cosmos-agent-0.5.3.tgz
 create-cosmos-agent --version
 ```
 
-Alternatively, you can install the tarball from your local copy or internal share. The final command should print `0.5.2`. npm extracts the tarball automatically during installation.
+Alternatively, you can install the tarball from your local copy or internal share. The final command
+should print `0.5.3`. npm extracts the tarball automatically during installation.
 
 ### Optional: Enable Tab completion
 
@@ -136,7 +137,7 @@ Stop `npm run dev` with `Ctrl+C`, then run:
 npm run emulator:stop
 cd ..
 rmdir /s /q team-agent
-del /q create-cosmos-agent-0.5.2.tgz
+del /q create-cosmos-agent-0.5.3.tgz
 ```
 
 The globally installed CLI remains available. Remove it with
