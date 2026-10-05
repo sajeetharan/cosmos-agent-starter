@@ -10,6 +10,7 @@ const requiredFiles = [
   "packages/memory/src/index.ts",
   "packages/tools/src/index.ts",
   ".github/copilot-instructions.md",
+  ".github/skills/cosmosdb-best-practices/SKILL.md",
 ];
 
 export async function assertSafeDestination(destination: string, confirmed: boolean): Promise<void> {

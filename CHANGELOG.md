@@ -5,12 +5,16 @@ Notable changes to `create-cosmos-agent` are documented here. The project follow
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-10-05
+
 ### Added
 
 - A 60-second bootstrap quickstart and copy-paste commands for every starter.
 - Live adoption links and a community project showcase submission form.
 - Consistent package, repository, release, media, and issue links.
 - Documentation of the telemetry-free usage measurement policy.
+- An on-demand Cosmos DB best-practices Agent Skill, based on the Azure Cosmos DB Agent Kit, in
+  every generated project.
 
 ### Changed
 
@@ -29,5 +33,6 @@ Notable changes to `create-cosmos-agent` are documented here. The project follow
 - Package metadata now points to the canonical GitHub repository.
 - Improved generated Cosmos DB client and emulator initialization behavior.
 
-[Unreleased]: https://github.com/sajeetharan/cosmos-agent-starter/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/sajeetharan/cosmos-agent-starter/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/sajeetharan/cosmos-agent-starter/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/sajeetharan/cosmos-agent-starter/releases/tag/v0.5.3

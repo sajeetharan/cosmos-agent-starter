@@ -46,6 +46,13 @@ describe("scenario composition", () => {
     expect(await readFile(join(first, "cosmos-project.json"), "utf8"))
       .toBe(await readFile(join(second, "cosmos-project.json"), "utf8"));
     expect(await readFile(join(first, ".github", "copilot-instructions.md"), "utf8")).toMatch(/DefaultAzureCredential/);
+    const cosmosSkill = await readFile(
+      join(first, ".github", "skills", "cosmosdb-best-practices", "SKILL.md"),
+      "utf8",
+    );
+    expect(cosmosSkill).toMatch(/^---[\s\S]*name: cosmosdb-best-practices[\s\S]*---/);
+    expect(cosmosSkill).toContain("AzureCosmosDB/cosmosdb-agent-kit");
+    expect(cosmosSkill).toContain("Apply this skill on demand");
     expect(await readFile(join(first, "docs", "architecture.md"), "utf8"))
       .toMatch(/Conversation store[\s\S]*Durable memory store/);
     const emulatorSource = await readFile(join(first, "scripts", "init-emulator.ts"), "utf8");
@@ -81,6 +88,10 @@ describe("scenario composition", () => {
         scenario: string;
       };
       expect(manifest.scenario).toBe(template);
+      expect(await readFile(
+        join(path, ".github", "skills", "cosmosdb-best-practices", "SKILL.md"),
+        "utf8",
+      )).toContain("Azure Cosmos DB best practices");
       expect(await readFile(join(path, "apps", "web", "src", "App.tsx"), "utf8"))
         .toContain("Context-aware assistant");
       expect(await readFile(join(path, "apps", "api", "src", "server.ts"), "utf8"))

@@ -163,8 +163,9 @@ When you are ready for Azure
 ## One-command bootstrap
 
 Use `bootstrap` for a Neon-style project setup that scaffolds the application, installs
-dependencies, initializes Git, includes Copilot instructions, and links the directory to a local
-Cosmos Agent environment context:
+dependencies, initializes Git, includes Copilot instructions and an on-demand
+[`cosmosdb-best-practices`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) Agent Skill, and
+links the directory to a local Cosmos Agent environment context:
 
 ```powershell
 npx create-cosmos-agent@latest bootstrap my-agent --yes
@@ -335,7 +336,7 @@ If your corporate npm proxy has not mirrored the latest release, download the `.
 [GitHub Releases](https://github.com/sajeetharan/cosmos-agent-starter/releases) and run:
 
 ```powershell
-npx --yes --package .\create-cosmos-agent-0.5.3.tgz create-cosmos-agent my-agent --yes
+npx --yes --package .\create-cosmos-agent-0.5.4.tgz create-cosmos-agent my-agent --yes
 ```
 
 ## Develop the CLI
