@@ -11,6 +11,7 @@ describe("npm release workflow", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("ref: ${{ inputs.tag }}");
     expect(workflow).toContain("node-version: 24");
+    expect(workflow).toContain("registry-url: https://registry.npmjs.org/");
     expect(workflow).toContain("npm install --global npm@11");
     expect(workflow).toContain('test "$RELEASE_TAG" = "v$package_version"');
     expect(workflow).toContain("npm publish --access public --provenance");
