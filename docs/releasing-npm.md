@@ -4,14 +4,17 @@ Production npm releases use the manual GitHub **Publish to npm** workflow in
 [`publish-npm.yml`](../.github/workflows/publish-npm.yml). The package is published to the
 maintainer's personal npm account as the existing unscoped `create-cosmos-agent` package.
 
-Do not publish from a developer machine. The workflow uses the repository's `NPM_TOKEN` secret,
-validates the immutable release tag, and emits npm provenance.
+Do not publish from a developer machine. The workflow uses npm Trusted Publishing with GitHub OIDC,
+validates the immutable release tag, and emits npm provenance without a long-lived token.
 
 ## One-time configuration
 
-1. Create a granular npm access token with read/write access to `create-cosmos-agent`.
-2. Configure the repository Actions secret `NPM_TOKEN` with that token.
-3. Require two-factor authentication for the npm account and limit the token to this package.
+1. Open the `create-cosmos-agent` package settings on npmjs.com.
+2. Add a GitHub Actions Trusted Publisher for:
+   - owner: `sajeetharan`;
+   - repository: `cosmos-agent-starter`;
+   - workflow: `publish-npm.yml`.
+3. Keep two-factor authentication enabled for the npm account.
 
 ## Release process
 
