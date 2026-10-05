@@ -350,7 +350,7 @@ npm run validate
 
 See the [changelog](CHANGELOG.md), [support guide](SUPPORT.md),
 [contribution guidance](CONTRIBUTING.md), and [security policy](SECURITY.md). Maintainers must
-publish npm releases through the [Microsoft ESRP release process](docs/releasing-npm.md).
+publish npm releases through the guarded [GitHub release workflow](docs/releasing-npm.md).
 
 ## License
 

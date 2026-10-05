@@ -5,6 +5,10 @@ Notable changes to `create-cosmos-agent` are documented here. The project follow
 
 ## [Unreleased]
 
+### Changed
+
+- Restored guarded, tag-based publishing for the maintainer-owned npm package with npm provenance.
+
 ## [0.5.4] - 2026-10-05
 
 ### Added
