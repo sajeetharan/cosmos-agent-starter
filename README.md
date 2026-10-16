@@ -21,9 +21,9 @@ Build production-oriented TypeScript AI agents with a guided CLI and an Azure Co
 [![License](https://img.shields.io/github/license/sajeetharan/cosmos-agent-starter)](LICENSE)
 
 [npm package](https://www.npmjs.com/package/create-cosmos-agent) ·
-[documentation](#quickstart) ·
+[quickstart](#60-second-quickstart) ·
 [report an issue](https://github.com/sajeetharan/cosmos-agent-starter/issues) ·
-[contribute](CONTRIBUTING.md)
+[contribute](#contributing)
 
 `create-cosmos-agent` generates a complete API and React application with memory, vector retrieval,
 tenant isolation, approval-gated actions, telemetry, tests, containers, and Azure infrastructure.
@@ -40,6 +40,18 @@ Cosmos DB without replacing the application contracts.
                                  +-------> App Insights
                                  '-------> Approval-gated actions
 ```
+
+## On this page
+
+- [Quickstart](#60-second-quickstart)
+- [Choose a starter](#working-starters)
+- [Demos](#see-it-in-action) and [tutorials](#learn-by-building)
+- [Guided setup](#guided-setup) and [bootstrap options](#one-command-bootstrap)
+- [CLI commands](#essential-commands)
+- [Move from local to Azure](#move-from-local-to-azure)
+- [Contributing](#contributing) and [repository layout](#repository-layout)
+- [Support and security](#support-and-security)
+- [License](#license)
 
 ## See it in action
 
@@ -62,7 +74,8 @@ commands and generated architecture without provisioning billable resources.
 
 ## 60-second quickstart
 
-Requires Node.js 20 or later.
+Requires Node.js 20 or later and npm. The examples below use PowerShell; the single-line
+quickstart commands also work in Bash and Zsh.
 
 ```powershell
 npx create-cosmos-agent@latest bootstrap my-agent --yes
@@ -189,21 +202,16 @@ zero-cost local path.
 Use `--no-install`, `--no-git`, or `--no-link` to skip individual setup steps. The local context is
 stored in `.cosmos-agent/context.json` and excluded from Git.
 
-## Templates
+## Scaffold without installing dependencies
 
-| Template              | Use case                                                                   |
-| --------------------- | -------------------------------------------------------------------------- |
-| `chat-agent-ts`       | Conversational assistants with memory and safe actions                     |
-| `rag-agent-ts`        | Grounded document Q&A with vector retrieval and citations                  |
-| `customer-support-ts` | Customer context, ticket workflows, and approvals                          |
-| `event-agent-ts`      | Service Bus-triggered agents with idempotency, retries, and dead-lettering |
-| `multi-agent-ts`      | Planner, specialist, and reviewer workflows                                |
-| `agent-memory-ts`     | Lightweight tenant-safe memory and approval primitives                     |
-
-Choose a template directly:
+The [starter table](#working-starters) uses `bootstrap` to install dependencies automatically.
+Use the create command directly when you want to scaffold first and install later:
 
 ```powershell
 npx create-cosmos-agent@latest knowledge-agent --template rag-agent-ts --yes
+cd knowledge-agent
+npm install
+npm run dev
 ```
 
 Create an event-driven worker:
@@ -339,18 +347,103 @@ If your corporate npm proxy has not mirrored the latest release, download the `.
 npx --yes --package .\create-cosmos-agent-0.5.4.tgz create-cosmos-agent my-agent --yes
 ```
 
-## Develop the CLI
+## Contributing
+
+Contributions are welcome: documentation fixes, bug reports, regression tests, and improvements to
+the CLI or generated starters all help. You do not need an Azure subscription to start working on
+the CLI or the default local application.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for composition rules and generated-output validation
+requirements. For a substantial feature or behavior change, open an
+[issue](https://github.com/sajeetharan/cosmos-agent-starter/issues) first to discuss the approach.
+
+### Set up a development checkout
+
+You need Git, Node.js 20 or later, and npm. Fork the repository on GitHub, then clone **your fork**
+(replace `YOUR-USERNAME` below):
 
 ```powershell
-git clone https://github.com/sajeetharan/cosmos-agent-starter.git
+git clone https://github.com/YOUR-USERNAME/cosmos-agent-starter.git
 cd cosmos-agent-starter
+git switch -c docs-or-feature-name
 npm install
 npm run validate
 ```
 
-See the [changelog](CHANGELOG.md), [support guide](SUPPORT.md),
-[contribution guidance](CONTRIBUTING.md), and [security policy](SECURITY.md). Maintainers must
-publish npm releases through the guarded [GitHub release workflow](docs/releasing-npm.md).
+### Run your local CLI changes
+
+From the repository root, use `npm run dev --` to run the checked-out source rather than the
+published npm package:
+
+```powershell
+npm run dev -- --help
+npm run dev -- list
+npm run dev -- ../cosmos-agent-smoke --template chat-agent-ts --dry-run --json
+```
+
+The dry run previews generation without writing a project. To exercise the generated application,
+use a new directory **outside this checkout**:
+
+```powershell
+npm run dev -- bootstrap ../cosmos-agent-smoke --template chat-agent-ts --yes
+cd ../cosmos-agent-smoke
+npm run dev
+```
+
+Stop the development server before running further checks. Follow the generated README for
+scenario-specific setup, and return to the CLI checkout to continue developing.
+
+### Repository layout
+
+The generator composes a language base with the feature packs selected by a scenario.
+
+| Location | What belongs here |
+| --- | --- |
+| [`src/cli/`](src/cli/) | Argument parsing, prompts, terminal output, and command dispatch |
+| [`src/generator/`](src/generator/) | Template composition, bootstrap, diagnostics, and validation |
+| [`src/bases/`](src/bases/) | Language/runtime fundamentals and base templates |
+| [`src/features/`](src/features/) | Reusable feature packs; generated files live in each pack's `template/` directory |
+| [`src/scenarios/`](src/scenarios/) | Declarative starter definitions that select a base and feature packs |
+| [`tests/`](tests/) | CLI, generator, and release tests |
+| [`docs/`](docs/) | Tutorials, demo material, and maintainer release guidance |
+
+Edit the source templates, not only a generated project, so future scaffolds include your changes.
+
+### Check and submit a pull request
+
+Run checks from the CLI repository root:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev -- --help` | Run the CLI from source |
+| `npm test -- tests/cli/arguments.test.ts` | Example focused test run; choose the test file relevant to your change |
+| `npm run lint` | Run ESLint |
+| `npm run validate` | Run type checking, the test suite, and the build |
+
+`validate` does not include linting. For code changes, run both `npm run lint` and
+`npm run validate` before submitting. If you change generated output, also generate a fresh project
+and follow the additional checks in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- Keep the change focused and add regression tests for behavior changes.
+- Update documentation when commands, options, or generated behavior change.
+- Push your branch to your fork and open a pull request against this repository's `main` branch.
+- Explain the problem, link any related issue, and list the checks you ran. Include screenshots or
+  terminal output when useful, with sensitive values removed.
+
+For release history, see the [changelog](CHANGELOG.md). Maintainers must publish npm releases through
+the guarded [GitHub release workflow](docs/releasing-npm.md).
+
+## Support and security
+
+- **Questions and bugs:** search [existing issues](https://github.com/sajeetharan/cosmos-agent-starter/issues)
+  and follow the [support guide](SUPPORT.md) when opening a report.
+- **Security vulnerabilities:** follow [SECURITY.md](SECURITY.md) and report privately, not in a
+  public issue.
+- **Share your work:** [submit a showcase](https://github.com/sajeetharan/cosmos-agent-starter/issues/new?template=showcase.yml)
+  to help other contributors learn from your project.
+
+Never include credentials, connection strings, customer data, or production identifiers in issues,
+pull requests, or attached logs.
 
 ## License
 
