@@ -211,6 +211,14 @@ stored in `.cosmos-agent/context.json` and excluded from Git.
 
 ## Scaffold without installing dependencies
 
+Completion instructions are scenario-aware and start by entering the generated
+directory. They include `npm install` only if bootstrap did not install, show a
+web URL only when a web app exists, and explain API-only or stdin-worker startup.
+Windows instructions target PowerShell; macOS/Linux instructions target Bash/Zsh.
+JSON retains `nextSteps` and adds the structured `nextStepPlan`; optional Azure
+commands are separate and deployment is marked billable. See the
+[next-steps PRD](docs/prd/29-scenario-next-steps.md) for the contract.
+
 The [starter table](#working-starters) uses `bootstrap` to install dependencies automatically.
 Use the create command directly when you want to scaffold first and install later:
 

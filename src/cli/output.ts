@@ -1,6 +1,7 @@
 import type { DoctorFinding } from "../generator/doctor.js";
 import type { AzureReadinessFinding } from "../generator/azure-readiness.js";
 import { brandBanner, statusTag, style } from "./style.js";
+import type { NextStepPlan } from "./next-steps.js";
 
 export const helpText = `create-cosmos-agent - scaffold secure Azure Cosmos DB agents
 
@@ -124,30 +125,16 @@ export function formatHelp(command?: HelpCommand): string {
   ].filter(Boolean).join("\n\n");
 }
 
-export function nextSteps(destination: string, includeWeb = true): string[] {
-  return [
-    `cd "${destination}"`,
-    "npm install",
-    "npm run dev",
-    ...(includeWeb ? ["Open http://localhost:5173"] : []),
-    "npx create-cosmos-agent prepare-azure .",
-    "azd up",
-  ];
-}
-
-export function printNextSteps(destination: string, includeWeb = true): void {
-  const steps = nextSteps(destination, includeWeb);
-  console.log(`\n${brandBanner()}`);
-  console.log(`\n${statusTag("success")} Created Cosmos Agent Starter`);
-  console.log(`  ${style.dim(destination)}`);
-  console.log(`\n${style.bold("Next steps")}`);
-  for (const [index, step] of steps.slice(0, includeWeb ? 4 : 3).entries()) {
-    console.log(`  ${style.cyan(String(index + 1) + ".")} ${step}`);
+export function printNextSteps(plan: NextStepPlan): void {
+  console.log(`\n${style.bold(`Next steps (${plan.shell === "powershell" ? "PowerShell" : "Bash/Zsh"})`)}`);
+  for (const step of plan.local) {
+    console.log(`  ${step.kind === "command" ? "> " : ""}${step.text}`);
   }
-  console.log(`\n${style.bold("When you are ready for Azure")}`);
-  console.log(`  ${style.blue(">")} ${steps.at(-2)}`);
-  console.log(`  ${style.blue(">")} ${steps.at(-1)}`);
-  console.log(`\n${style.dim("💡 Tip: Run 'npx create-cosmos-agent doctor .' to inspect environment security.")}`);
+  console.log(`\n${style.bold("Optional Azure workflow")}`);
+  for (const step of plan.azure) {
+    console.log(`  ${step.kind === "command" ? "> " : ""}${step.text}` +
+      (step.billable ? " (may create billable resources)" : ""));
+  }
 }
 
 export function summarizeFindings(findings: DoctorFinding[]) {
