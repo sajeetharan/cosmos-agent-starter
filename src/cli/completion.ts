@@ -12,6 +12,7 @@ const commands: CompletionCandidate[] = [
   { value: "create", description: "Create a project" },
   { value: "bootstrap", description: "Scaffold, install, link, and optionally deploy a configured project" },
   { value: "resume-bootstrap", description: "Resume recorded setup without overwriting source files" },
+  { value: "local-status", description: "Inspect local configuration and optional runtime connectivity" },
   { value: "list", description: "List scenario templates" },
   { value: "doctor", description: "Inspect security and configuration" },
   { value: "prepare-azure", description: "Check Azure deployment readiness" },
@@ -20,6 +21,8 @@ const commands: CompletionCandidate[] = [
 ];
 
 const flags: CompletionCandidate[] = [
+  { value: "--check-connectivity", description: "Opt in to bounded local-status connectivity probes" },
+  { value: "--timeout", description: "Probe timeout in milliseconds (100-10000)" },
   { value: "--template", description: "Scenario template" },
   { value: "--provider", description: "AI provider" },
   { value: "--auth", description: "Development authentication mode" },
@@ -193,6 +196,10 @@ end
 
 local project_matcher = clink.argmatcher():addarg(clink.dirmatches)
   :addflags("--environment", "--json", "--help")
+local local_status_matcher = clink.argmatcher():addarg(clink.dirmatches)
+  :addflags("-C", "--project", "--check-connectivity", "--timeout", "--json", "--help")
+local resume_matcher = clink.argmatcher():addarg(clink.dirmatches)
+  :addflags("-C", "--project", "--deploy", "--json", "--help")
 local completion_matcher = clink.argmatcher():addarg(completion_values):nofiles()
 local no_args_matcher = clink.argmatcher():addflags("--json", "--help"):nofiles()
 
@@ -201,6 +208,8 @@ add_common_flags(clink.argmatcher("create-cosmos-agent")
     "wizard"..scaffold_matcher(),
     "create"..scaffold_matcher(),
     "bootstrap"..scaffold_matcher(),
+    "resume-bootstrap"..resume_matcher,
+    "local-status"..local_status_matcher,
     "list"..no_args_matcher,
     "doctor"..project_matcher,
     "prepare-azure"..project_matcher,

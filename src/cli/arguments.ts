@@ -10,6 +10,7 @@ export type CliCommand =
   | "create"
   | "bootstrap"
   | "resume-bootstrap"
+  | "local-status"
   | "list"
   | "doctor"
   | "prepare-azure"
@@ -19,6 +20,8 @@ export type CliCommand =
 
 export interface CliOptions {
   suppliedOptions?: (keyof CliOptions)[];
+  checkConnectivity?: boolean;
+  timeoutMs?: number;
   command: CliCommand;
   destination?: string;
   projectDirectory: string;
@@ -49,7 +52,8 @@ export interface CliOptions {
   json: boolean;
 }
 
-const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "projectDirectory" | "provider" | "authMode" | "storage" | "environmentName" | "azureSetup" | "azureLocation" | "azureOpenAIEndpoint" | "azureOpenAIChatDeployment" | "cosmosEndpoint" | "entraTenantId" | "entraAudience" | "entraClientId" | "entraScope">([
+const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "projectDirectory" | "provider" | "authMode" | "storage" | "environmentName" | "azureSetup" | "azureLocation" | "azureOpenAIEndpoint" | "azureOpenAIChatDeployment" | "cosmosEndpoint" | "entraTenantId" | "entraAudience" | "entraClientId" | "entraScope" | "timeoutMs">([
+  ["--timeout", "timeoutMs"],
   ["--template", "template"],
   ["-t", "template"],
   ["--capacity", "capacity"],
@@ -73,6 +77,7 @@ const valueFlags = new Map<string, "template" | "capacity" | "localMode" | "proj
 ] as const);
 
 const booleanFlags = new Set([
+  "--check-connectivity",
   "--list",
   "-l",
   "--yes",
@@ -112,7 +117,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     wizard
       ? "create"
       : first === "create" || first === "bootstrap" || first === "doctor" ||
-          first === "prepare-azure" || first === "validate" || first === "list" || first === "resume-bootstrap"
+          first === "prepare-azure" || first === "validate" || first === "list" || first === "resume-bootstrap" || first === "local-status"
       ? first
       : undefined;
   const commandOffset = explicitCommand ? 1 : 0;
@@ -144,6 +149,8 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   let force = false;
   let dryRun = false;
   let json = false;
+  let checkConnectivity = false;
+  let timeoutMs: number | undefined;
 
   for (let index = commandOffset; index < args.length; index += 1) {
     const argument = args[index]!;
@@ -155,6 +162,13 @@ export function parseArguments(rawArgs: string[]): CliOptions {
           [`Supply a value after ${argument}.`]);
       }
       if (valueKey === "template") template = value;
+      if (valueKey === "timeoutMs") {
+        if (!/^\d+$/.test(value) || Number(value) < 100 || Number(value) > 10000) {
+          throw new CliError("CLI_INVALID_VALUE", "--timeout must be 100 to 10000 milliseconds.",
+            ["Use local-status --check-connectivity --timeout 2000."]);
+        }
+        timeoutMs = Number(value);
+      }
       if (valueKey === "capacity") capacity = value;
       if (valueKey === "localMode") localMode = value;
       if (valueKey === "provider") provider = value;
@@ -180,6 +194,9 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         matches.length ? matches.map((match) => `Did you mean ${match}?`) : ["Run with --help for supported options."]);
     }
     switch (argument) {
+      case "--check-connectivity":
+        checkConnectivity = true;
+        break;
       case "--help":
       case "-h":
         command = "help";
@@ -238,6 +255,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         if (
           explicitCommand === "doctor" ||
           explicitCommand === "resume-bootstrap" ||
+          explicitCommand === "local-status" ||
           explicitCommand === "prepare-azure" ||
           explicitCommand === "validate"
         ) {
@@ -248,7 +266,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         } else if (command === "create" || command === "bootstrap") {
           if (destination) {
             const matches = !explicitCommand
-              ? suggest(destination, ["create", "bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"])
+              ? suggest(destination, ["create", "bootstrap", "resume-bootstrap", "local-status", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"])
               : [];
             throw new CliError("CLI_POSITIONAL_ARGUMENT", "Only one destination can be specified.",
               [...matches.map((match) => `Did you mean the ${match} command?`),
@@ -295,6 +313,12 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     throw new Error("--force and --dry-run cannot be used together.");
   }
   const scaffoldingCommand = command === "create" || command === "bootstrap";
+  if (command !== "local-status" && (checkConnectivity || timeoutMs !== undefined)) {
+    throw new Error("--check-connectivity and --timeout are only valid with local-status.");
+  }
+  if (timeoutMs !== undefined && !checkConnectivity) {
+    throw new Error("--timeout requires explicit --check-connectivity.");
+  }
   if (!scaffoldingCommand && (force || dryRun)) {
     throw new Error("--force and --dry-run are only valid with create or bootstrap.");
   }
@@ -411,6 +435,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         })[key].some((flag) => args.includes(flag))),
     ],
     command,
+    ...(command === "local-status" ? { checkConnectivity, ...(timeoutMs === undefined ? {} : { timeoutMs }) } : {}),
     ...(destination ? { destination } : {}),
     projectDirectory,
     template,

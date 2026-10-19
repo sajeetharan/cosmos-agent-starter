@@ -68,5 +68,7 @@ describe("shell completion", () => {
     expect(completionScript("clink", scenarios)).toMatch(/--provider/);
     expect(completionScript("clink", scenarios)).toMatch(/--azure-setup/);
     expect(completionScript("clink", scenarios)).toMatch(/provision/);
+    expect(completionScript("clink", scenarios)).toContain('"local-status"..local_status_matcher');
+    expect(completionScript("clink", scenarios)).toContain('"resume-bootstrap"..resume_matcher');
   });
 });

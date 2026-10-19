@@ -17,6 +17,7 @@ import {
   printFindings,
   printAzureReadiness,
   printValidationStage,
+  printLocalStatus,
   printNextSteps,
   summarizeFindings,
 } from "./output.js";
@@ -30,6 +31,7 @@ import { buildNextStepPlan, nextSteps } from "./next-steps.js";
 import { CliError, invalidChoice, redactError } from "./errors.js";
 import { runPreflight } from "../generator/preflight.js";
 import { resumeBootstrap } from "../generator/resume.js";
+import { runLocalStatus } from "../generator/local-status.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -137,6 +139,16 @@ export async function runCli(args: string[]): Promise<number> {
         });
       }
       return result.exitCode;
+    }
+    if (options.command === "local-status") {
+      const project = resolve(options.projectDirectory);
+      const result = await runLocalStatus(project, {
+        checkConnectivity: options.checkConnectivity ?? false,
+        ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      });
+      if (options.json) writeJson({ command: "local-status", project, ...result });
+      else printLocalStatus(result);
+      return result.status === "blocked" ? 1 : 0;
     }
     if (options.command === "resume-bootstrap") {
       const project = resolve(options.projectDirectory);

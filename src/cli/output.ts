@@ -3,6 +3,7 @@ import type { AzureReadinessFinding } from "../generator/azure-readiness.js";
 import type { ValidationStage } from "../generator/validate.js";
 import { brandBanner, statusTag, style } from "./style.js";
 import type { NextStepPlan } from "./next-steps.js";
+import type { LocalStatusResult } from "../generator/local-status.js";
 
 export const helpText = `create-cosmos-agent - scaffold secure Azure Cosmos DB agents
 
@@ -10,6 +11,7 @@ Usage:
   create-cosmos-agent [create] <destination> [options]
   create-cosmos-agent bootstrap <destination> [options]
   create-cosmos-agent resume-bootstrap [project] [--deploy] [--json]
+  create-cosmos-agent local-status [project] [--check-connectivity] [--timeout <ms>] [--json]
   create-cosmos-agent list [--json]
   create-cosmos-agent doctor [project] [--json]
   create-cosmos-agent prepare-azure [project] [--environment <name>] [--json]
@@ -20,6 +22,7 @@ Commands:
   create [destination]  Create a project (default command)
   bootstrap [destination] Scaffold, install, link, and optionally deploy a configured project
   resume-bootstrap [project] Resume setup without regenerating files; deployment is opt-in
+  local-status [project] Inspect local setup; connectivity checks require --check-connectivity
   wizard [destination]  Create with a descriptive guided setup
   list                  List available templates
   doctor [project]      Report security and configuration findings
@@ -54,7 +57,7 @@ Create options:
       --dry-run              Print the resolved generation plan without writing files
 
 General options:
-  -C, --project <path>       Project directory for doctor, prepare-azure, or validate
+  -C, --project <path>       Project directory for inspection, validation, or recovery
       --json                 Emit machine-readable JSON
   -l, --list                 Alias for the list command
   -h, --help                 Show help
@@ -73,7 +76,7 @@ Examples:
   create-cosmos-agent prepare-azure ./my-agent --environment my-agent-dev
   create-cosmos-agent validate -C ./my-agent --json`;
 
-export const helpCommands = ["create", "bootstrap", "resume-bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"] as const;
+export const helpCommands = ["create", "bootstrap", "resume-bootstrap", "local-status", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"] as const;
 export type HelpCommand = typeof helpCommands[number];
 
 export function formatHelp(command?: HelpCommand): string {
@@ -83,6 +86,7 @@ export function formatHelp(command?: HelpCommand): string {
     create: "Scaffold files only; install dependencies yourself. Use bootstrap to install and link too.",
     bootstrap: "Scaffold, install dependencies, initialize Git, and link local context. Deployment requires --deploy and may be billable.",
     "resume-bootstrap": "Resume recorded setup without regenerating source or environment files. Rechecks prerequisites and completed stages; never retries uncertain deployment.",
+    "local-status": "Read-only local configuration inspection. Optional bounded probes never start processes, obtain tokens, or call model inference.",
     wizard: "Guided create with descriptive prompts. Unlike bootstrap, it does not install dependencies.",
     list: "List supported scenario templates.",
     doctor: "Inspect generated-project security and configuration; does not provision resources.",
@@ -94,6 +98,7 @@ export function formatHelp(command?: HelpCommand): string {
     create: "create <destination> [options]",
     bootstrap: "bootstrap <destination> [options]",
     "resume-bootstrap": "resume-bootstrap [project] [-C <path>] [--deploy] [--json]",
+    "local-status": "local-status [project] [-C <path>] [--check-connectivity] [--timeout <ms>] [--json]",
     wizard: "wizard [destination] [options]",
     list: "list [--json]",
     doctor: "doctor [project] [-C <path>] [--json]",
@@ -105,6 +110,7 @@ export function formatHelp(command?: HelpCommand): string {
     create: "create my-agent --template chat-agent-ts --yes",
     bootstrap: "bootstrap my-agent --yes --no-install",
     "resume-bootstrap": "resume-bootstrap -C \"my agent\" --json",
+    "local-status": "local-status my-agent --check-connectivity --timeout 2000 --json",
     wizard: "wizard my-agent",
     list: "list --json",
     doctor: "doctor -C \"my agent\" --json",
@@ -123,10 +129,11 @@ export function formatHelp(command?: HelpCommand): string {
       command !== "bootstrap" ? "  --azure-setup later|existing (provision requires bootstrap)" : "",
       "  --yes accepts defaults, not overwrites or implicit billable deployment.",
       "  Use create <destination> explicitly for command-like directory names."] : []),
-    ...(command === "doctor" || command === "validate" || command === "prepare-azure" || command === "resume-bootstrap"
+    ...(command === "doctor" || command === "validate" || command === "prepare-azure" || command === "resume-bootstrap" || command === "local-status"
       ? ["Options:\n  -C, --project <path>  Project directory\n  --json  Machine-readable output",
         ...(command === "prepare-azure" ? ["  -e, --environment <name>  Azure environment"] : [])] : []),
     ...(command === "resume-bootstrap" ? ["  --deploy  Explicit deployment intent (billable); uncertain prior deployment must be reconciled manually."] : []),
+    ...(command === "local-status" ? ["  --check-connectivity  Opt in to API health, web HEAD, and applicable TCP probes\n  --timeout <ms>  Per-probe timeout, 100-10000 (default 2000); requires --check-connectivity"] : []),
     "  -h, --help  Show this command's help",
     `Example:\n  create-cosmos-agent ${examples[command]}`,
   ].filter(Boolean).join("\n\n");
@@ -137,11 +144,23 @@ export function printNextSteps(plan: NextStepPlan): void {
   for (const step of plan.local) {
     console.log(`  ${step.kind === "command" ? "> " : ""}${step.text}`);
   }
+
   console.log(`\n${style.bold("Optional Azure workflow")}`);
   for (const step of plan.azure) {
     console.log(`  ${step.kind === "command" ? "> " : ""}${step.text}` +
       (step.billable ? " (may create billable resources)" : ""));
   }
+}
+
+export function printLocalStatus(result: LocalStatusResult): void {
+  console.log(`${style.bold("Local status")}: ${result.status}`);
+  for (const item of result.endpoints) {
+    console.log(`  ${item.service}: ${item.address} (${item.check}, ${item.status})`);
+  }
+  for (const item of result.findings) {
+    console.log(`${statusTag(item.severity)} ${item.code} ${item.message}\n  Next: ${item.remediation}`);
+  }
+  console.log(`${result.summary.errors} error(s), ${result.summary.warnings} warning(s). No files were changed.`);
 }
 
 export function summarizeFindings(findings: DoctorFinding[]) {

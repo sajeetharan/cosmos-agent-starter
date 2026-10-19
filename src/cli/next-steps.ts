@@ -66,6 +66,9 @@ export function buildNextStepPlan(
   if (options.storage === "in-memory") {
     local.push(instruction("In-memory data is lost when the process stops."));
   }
+  local.push(instruction(
+    "Inspect setup with npx create-cosmos-agent local-status .; after starting services, add --check-connectivity for bounded readiness probes.",
+  ));
   const azure: NextStep[] = [];
   if (bootstrap?.deployed) {
     azure.push(instruction(
