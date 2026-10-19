@@ -25,6 +25,7 @@ import { runDoctor } from "../generator/doctor.js";
 import { validateProject } from "../generator/validate.js";
 import { bootstrapProject } from "../generator/bootstrap.js";
 import { runAzureReadiness } from "../generator/azure-readiness.js";
+import { runPreflight } from "../generator/preflight.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -170,6 +171,19 @@ export async function runCli(args: string[]): Promise<number> {
       }
       return 0;
     }
+    const preflight = await runPreflight(options);
+    if (!options.json) {
+      for (const finding of preflight.findings) {
+        console.log(`${statusTag(finding.severity)} ${finding.code} ${finding.message}`);
+        if (finding.severity !== "info") console.log(`  Next: ${finding.remediation}`);
+      }
+    }
+    if (!preflight.ready) {
+      if (options.json) writeJson({
+        command: options.command, status: "blocked", destination, preflight,
+      });
+      return 1;
+    }
     if (!options.json) {
       console.log(`\n${statusTag("info")} Generating project files...`);
     }
@@ -209,6 +223,7 @@ export async function runCli(args: string[]): Promise<number> {
           command: "bootstrap",
           status: result.deployed ? "deployed" : "bootstrapped",
           ...result,
+          preflight,
           nextSteps: [
             "npm run dev",
             ...(!result.deployed && result.environmentName
@@ -268,6 +283,7 @@ export async function runCli(args: string[]): Promise<number> {
         status: "created",
         destination: created,
         template: scenario.id,
+        preflight,
         nextSteps: nextSteps(created, includeWeb),
       });
     } else {
