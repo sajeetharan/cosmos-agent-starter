@@ -1,3 +1,5 @@
+import { CliError, invalidChoice, suggest } from "./errors.js";
+
 export type Capacity = "serverless" | "autoscale";
 export type LocalMode = "emulator" | "azure";
 export type AIProvider = "mock" | "azure-openai" | "openai" | "ollama";
@@ -147,7 +149,8 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     if (valueKey) {
       const value = args[index + 1];
       if (!value || value.startsWith("-")) {
-        throw new Error(`Option "${argument}" requires a value.`);
+        throw new CliError("CLI_MISSING_VALUE", `Option "${argument}" requires a value.`,
+          [`Supply a value after ${argument}.`]);
       }
       if (valueKey === "template") template = value;
       if (valueKey === "capacity") capacity = value;
@@ -170,7 +173,9 @@ export function parseArguments(rawArgs: string[]): CliOptions {
       continue;
     }
     if (argument.startsWith("-") && !booleanFlags.has(argument)) {
-      throw new Error(`Unknown option "${argument}". Run with --help for usage.`);
+      const matches = suggest(argument, [...valueFlags.keys(), ...booleanFlags]);
+      throw new CliError("CLI_UNKNOWN_OPTION", `Unknown option "${argument}".`,
+        matches.length ? matches.map((match) => `Did you mean ${match}?`) : ["Run with --help for supported options."]);
     }
     switch (argument) {
       case "--help":
@@ -238,7 +243,14 @@ export function parseArguments(rawArgs: string[]): CliOptions {
           }
           projectDirectory = argument;
         } else if (command === "create" || command === "bootstrap") {
-          if (destination) throw new Error("Only one destination can be specified.");
+          if (destination) {
+            const matches = !explicitCommand
+              ? suggest(destination, ["create", "bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"])
+              : [];
+            throw new CliError("CLI_POSITIONAL_ARGUMENT", "Only one destination can be specified.",
+              [...matches.map((match) => `Did you mean the ${match} command?`),
+                "Use create <destination> explicitly when the directory name resembles a command."]);
+          }
           destination = argument;
         } else {
           throw new Error(`The ${command} command does not accept a positional argument.`);
@@ -247,26 +259,22 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   }
 
   if (capacity !== "serverless" && capacity !== "autoscale") {
-    throw new Error(`Unsupported capacity "${capacity}". Use serverless or autoscale.`);
+    throw invalidChoice("capacity", capacity, ["serverless", "autoscale"]);
   }
   if (localMode !== "emulator" && localMode !== "azure") {
-    throw new Error(`Unsupported local mode "${localMode}". Use emulator or azure.`);
+    throw invalidChoice("local mode", localMode, ["emulator", "azure"]);
   }
   if (!["mock", "azure-openai", "openai", "ollama"].includes(provider)) {
-    throw new Error(
-      `Unsupported provider "${provider}". Use mock, azure-openai, openai, or ollama.`,
-    );
+    throw invalidChoice("provider", provider, ["mock", "azure-openai", "openai", "ollama"]);
   }
   if (authMode !== "local" && authMode !== "entra") {
-    throw new Error(`Unsupported authentication mode "${authMode}". Use local or entra.`);
+    throw invalidChoice("authentication mode", authMode, ["local", "entra"]);
   }
   if (storage !== "in-memory" && storage !== "cosmos") {
-    throw new Error(`Unsupported storage backend "${storage}". Use in-memory or cosmos.`);
+    throw invalidChoice("storage backend", storage, ["in-memory", "cosmos"]);
   }
   if (!(["later", "existing", "provision"] as const).includes(azureSetup as AzureSetup)) {
-    throw new Error(
-      `Unsupported Azure setup mode "${azureSetup}". Use later, existing, or provision.`,
-    );
+    throw invalidChoice("Azure setup mode", azureSetup, ["later", "existing", "provision"]);
   }
   for (const [name, value] of [
     ["Azure OpenAI endpoint", azureOpenAIEndpoint],

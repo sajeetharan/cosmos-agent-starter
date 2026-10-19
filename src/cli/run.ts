@@ -13,6 +13,7 @@ import {
 } from "./completion.js";
 import {
   formatHelp,
+  helpCommands,
   nextSteps,
   printFindings,
   printAzureReadiness,
@@ -25,6 +26,7 @@ import { runDoctor } from "../generator/doctor.js";
 import { validateProject } from "../generator/validate.js";
 import { bootstrapProject } from "../generator/bootstrap.js";
 import { runAzureReadiness } from "../generator/azure-readiness.js";
+import { CliError, invalidChoice, redactError } from "./errors.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,10 +43,15 @@ function writeJson(value: unknown): void {
 export async function runCli(args: string[]): Promise<number> {
   let json = args.includes("--json");
   try {
+    const helpCommand = helpCommands.find((command) => command === args[0]);
+    if (args.includes("--help") || args.includes("-h")) {
+      console.log(formatHelp(helpCommand));
+      return 0;
+    }
     if (args[0] === "completion") {
       const shell = args[1];
       if (shell !== "powershell" && shell !== "bash" && shell !== "zsh" && shell !== "clink") {
-        throw new Error("The completion command requires powershell, bash, zsh, or clink.");
+        throw invalidChoice("completion shell", shell ?? "", ["powershell", "bash", "zsh", "clink"]);
       }
       console.log(completionScript(shell as CompletionShell, await listScenarios()));
       return 0;
@@ -275,11 +282,15 @@ export async function runCli(args: string[]): Promise<number> {
     }
     return 0;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (json) console.error(JSON.stringify({ status: "error", message }));
+    const message = redactError(error instanceof Error ? error.message : String(error));
+    const code = error instanceof CliError ? error.code : "CLI_ERROR";
+    const suggestions = error instanceof CliError && error.suggestions.length
+      ? error.suggestions
+      : [`Run create-cosmos-agent ${helpCommands.find((command) => command === args[0]) ?? ""} --help for usage.`];
+    if (json) console.error(JSON.stringify({ status: "error", message, code, suggestions }));
     else console.error(
-      `${statusTag("error")} ${style.bold(message)}\n` +
-        `${style.dim("Run with --help for usage.")}`,
+      `${statusTag("error")} ${code} ${style.bold(message)}\n` +
+        suggestions.map((suggestion) => style.dim(suggestion)).join("\n"),
     );
     return 1;
   }
