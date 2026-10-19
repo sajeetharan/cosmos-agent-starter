@@ -183,6 +183,15 @@ When you are ready for Azure
 
 ## One-command bootstrap
 
+If setup fails, use the reported `resume-bootstrap --project "<destination>"`
+command instead of regenerating with `--force`. Recovery verifies the manifest,
+rechecks prerequisites and recorded stages, and preserves source edits, `.env`,
+and existing Git history. Dependency repair may rerun the originally requested
+installation. Deployment is never retried by default; uncertain deployment or
+Azure configuration requires manual reconciliation. Do not run concurrent
+bootstrap/resume operations in one directory. See the
+[recovery PRD](docs/prd/25-bootstrap-resume.md).
+
 Before writing files, create/bootstrap check Node.js 20+, npm, destination access,
 and Git when requested. Docker/Compose are required only for Cosmos emulator
 storage; azd is required only for deployment. Checks never install, sign in, or

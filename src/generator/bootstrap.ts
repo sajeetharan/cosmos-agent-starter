@@ -2,6 +2,9 @@ import { execFile, spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
+import { CliError, redactError } from "../cli/errors.js";
+import { quoteShell } from "../cli/next-steps.js";
+import { newBootstrapState, writeBootstrapState, type BootstrapState } from "./bootstrap-state.js";
 import {
   runAzureReadiness,
   type AzureReadinessResult,
@@ -33,6 +36,8 @@ export interface BootstrapProjectOptions {
   silent?: boolean;
   onProgress?: (progress: BootstrapProgress) => void;
   azureProvisioning?: AzureProvisioningConfiguration;
+  recoveryState?: BootstrapState;
+  skipStages?: BootstrapProgress["stage"][];
 }
 
 export interface AzureProvisioningConfiguration {
@@ -50,6 +55,7 @@ export interface BootstrapProgress {
   stage: "dependencies" | "git" | "context" | "azure" | "readiness" | "deployment";
   status: "started" | "completed";
   message: string;
+  elapsedMs?: number;
 }
 
 export interface BootstrapResult {
@@ -116,7 +122,7 @@ export const runBootstrapCommand: BootstrapCommandRunner = async (command) => {
         `Required command "${command.executable}" was not found. Install it and retry bootstrap.`,
       );
     }
-    throw new Error(`${command.executable} ${command.args.join(" ")} failed: ${detail}`);
+    throw new Error(`${command.executable} failed: ${redactError(detail)}`);
   }
 };
 
@@ -135,14 +141,30 @@ export async function bootstrapProject(
   readiness: AzureReadinessRunner = runAzureReadiness,
 ): Promise<BootstrapResult> {
   const silent = options.silent ?? false;
-  const report = (progress: BootstrapProgress) => {
+  const state = options.recoveryState ?? newBootstrapState(options);
+  const started = new Map<BootstrapProgress["stage"], number>();
+  const report = async (progress: BootstrapProgress) => {
+    if (progress.status === "started") {
+      if (progress.stage === "deployment") state.deploymentUncertain = true;
+      state.active = progress.stage;
+      delete state.failed;
+      started.set(progress.stage, performance.now());
+    } else {
+      state.completed = [...new Set([...state.completed, progress.stage])];
+      delete state.active;
+      progress.elapsedMs = performance.now() - (started.get(progress.stage) ?? performance.now());
+    }
+    await writeBootstrapState(options.destination, state);
     if (!silent) options.onProgress?.(progress);
   };
   if (options.deploy && !options.linkProject) {
     throw new Error("Azure deployment requires a linked project context.");
   }
-  if (options.installDependencies) {
-    report({
+  if (options.linkProject) state.environmentName = resolveEnvironmentName(options.destination, options.environmentName);
+  await writeBootstrapState(options.destination, state);
+  try {
+  if (options.installDependencies && !options.skipStages?.includes("dependencies")) {
+    await report({
       stage: "dependencies",
       status: "started",
       message: "Installing project dependencies...",
@@ -158,28 +180,28 @@ export async function bootstrapProject(
       cwd: options.destination,
       silent,
     });
-    report({
+    await report({
       stage: "dependencies",
       status: "completed",
       message: "Dependencies installed",
     });
   }
-  if (options.initializeGit) {
-    report({ stage: "git", status: "started", message: "Initializing Git repository..." });
+  if (options.initializeGit && !options.skipStages?.includes("git")) {
+    await report({ stage: "git", status: "started", message: "Initializing Git repository..." });
     await runner({
       executable: "git",
       args: ["init"],
       cwd: options.destination,
       silent,
     });
-    report({ stage: "git", status: "completed", message: "Git repository initialized" });
+    await report({ stage: "git", status: "completed", message: "Git repository initialized" });
   }
   const environmentName = options.linkProject
     ? resolveEnvironmentName(options.destination, options.environmentName)
     : undefined;
   const linkedAt = new Date().toISOString();
-  if (environmentName) {
-    report({
+  if (environmentName && !options.skipStages?.includes("context")) {
+    await report({
       stage: "context",
       status: "started",
       message: "Linking local project context...",
@@ -193,14 +215,14 @@ export async function bootstrapProject(
       deploymentStatus: "local",
       linkedAt,
     });
-    report({
+    await report({
       stage: "context",
       status: "completed",
       message: `Project context linked to ${environmentName}`,
     });
   }
   if (options.azureProvisioning && environmentName) {
-    report({ stage: "azure", status: "started", message: "Configuring Azure environment..." });
+    await report({ stage: "azure", status: "started", message: "Configuring Azure environment..." });
     if (!silent) {
       await runner({
         executable: "azd",
@@ -237,14 +259,14 @@ export async function bootstrapProject(
         silent,
       });
     }
-    report({
+    await report({
       stage: "azure",
       status: "completed",
       message: `Azure environment ${environmentName} configured`,
     });
   }
   if (options.deploy && environmentName) {
-    report({
+    await report({
       stage: "readiness",
       status: "started",
       message: "Checking Azure deployment readiness...",
@@ -259,12 +281,12 @@ export async function bootstrapProject(
           `Run create-cosmos-agent prepare-azure . --environment ${environmentName} for the full report.`,
       );
     }
-    report({
+    await report({
       stage: "readiness",
       status: "completed",
       message: "Azure deployment readiness confirmed",
     });
-    report({
+    await report({
       stage: "deployment",
       status: "started",
       message: "Deploying project to Azure...",
@@ -285,7 +307,7 @@ export async function bootstrapProject(
       linkedAt,
       deployedAt: new Date().toISOString(),
     });
-    report({
+    await report({
       stage: "deployment",
       status: "completed",
       message: "Azure deployment completed",
@@ -299,4 +321,14 @@ export async function bootstrapProject(
     linked: options.linkProject,
     deployed: options.deploy,
   };
+  } catch (error) {
+    if (state.active) state.failed = state.active;
+    await writeBootstrapState(options.destination, state);
+    const shell = process.platform === "win32" ? "powershell" : "posix";
+    const recovery = `npx create-cosmos-agent resume-bootstrap --project ${quoteShell(options.destination, shell)}`;
+    throw new CliError("BOOTSTRAP_STAGE_FAILED",
+      `Bootstrap failed during ${state.active ?? "setup"}. Completed: ${state.completed.join(", ") || "none"}. ` +
+      redactError(error instanceof Error ? error.message : String(error)),
+      [recovery, "Recovery never regenerates files or retries deployment without --deploy. Reconcile Azure state before requesting another billable operation."]);
+  }
 }

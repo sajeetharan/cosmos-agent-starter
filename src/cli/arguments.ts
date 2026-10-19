@@ -9,6 +9,7 @@ export type AzureSetup = "later" | "existing" | "provision";
 export type CliCommand =
   | "create"
   | "bootstrap"
+  | "resume-bootstrap"
   | "list"
   | "doctor"
   | "prepare-azure"
@@ -111,7 +112,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     wizard
       ? "create"
       : first === "create" || first === "bootstrap" || first === "doctor" ||
-          first === "prepare-azure" || first === "validate" || first === "list"
+          first === "prepare-azure" || first === "validate" || first === "list" || first === "resume-bootstrap"
       ? first
       : undefined;
   const commandOffset = explicitCommand ? 1 : 0;
@@ -236,6 +237,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
         if (argument.startsWith("-")) break;
         if (
           explicitCommand === "doctor" ||
+          explicitCommand === "resume-bootstrap" ||
           explicitCommand === "prepare-azure" ||
           explicitCommand === "validate"
         ) {
@@ -341,7 +343,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     !(
       command === "prepare-azure" &&
       ["--environment", "-e"].includes(flag)
-    )
+    ) && !(command === "resume-bootstrap" && flag === "--deploy")
   );
   if (
     command !== "bootstrap" &&
@@ -353,7 +355,7 @@ export function parseArguments(rawArgs: string[]): CliOptions {
     throw new Error('--azure-setup provision is only valid with bootstrap.');
   }
   if (azureSetup === "provision") deploy = true;
-  if (deploy && !linkProject) {
+  if (deploy && !linkProject && command !== "resume-bootstrap") {
     throw new Error("--deploy cannot be combined with --no-link.");
   }
   if (azureSetup === "provision" && provider !== "azure-openai") {
