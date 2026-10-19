@@ -101,8 +101,8 @@ describe("scenario-aware next steps", () => {
       expect(result.nextStepPlan).toEqual(expectedPlan);
       expect(result.nextSteps).toEqual(nextSteps(expectedPlan));
       expect(Object.keys(result).sort()).toEqual(command === "create"
-        ? ["command", "destination", "nextStepPlan", "nextSteps", "status", "template"]
-        : ["command", "dependenciesInstalled", "deployed", "destination", "gitInitialized", "linked", "nextStepPlan", "nextSteps", "status"]);
+        ? ["command", "destination", "nextStepPlan", "nextSteps", "preflight", "status", "template"]
+        : ["command", "dependenciesInstalled", "deployed", "destination", "gitInitialized", "linked", "nextStepPlan", "nextSteps", "preflight", "status"]);
     } finally {
       await rm(parent, { recursive: true, force: true });
     }

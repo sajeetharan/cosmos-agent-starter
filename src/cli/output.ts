@@ -70,8 +70,59 @@ Examples:
   create-cosmos-agent prepare-azure ./my-agent --environment my-agent-dev
   create-cosmos-agent validate -C ./my-agent --json`;
 
-export function formatHelp(): string {
-  return `${brandBanner()}\n\n${style.bold("Create secure, production-oriented AI agents.", undefined)}\n\n${helpText}`;
+export const helpCommands = ["create", "bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"] as const;
+export type HelpCommand = typeof helpCommands[number];
+
+export function formatHelp(command?: HelpCommand): string {
+  if (!command) return `${brandBanner()}\n\n${style.bold("Create secure, production-oriented AI agents.", undefined)}\n\n${helpText}`;
+  const creation = command === "create" || command === "bootstrap" || command === "wizard";
+  const descriptions: Record<HelpCommand, string> = {
+    create: "Scaffold files only; install dependencies yourself. Use bootstrap to install and link too.",
+    bootstrap: "Scaffold, install dependencies, initialize Git, and link local context. Deployment requires --deploy and may be billable.",
+    wizard: "Guided create with descriptive prompts. Unlike bootstrap, it does not install dependencies.",
+    list: "List supported scenario templates.",
+    doctor: "Inspect generated-project security and configuration; does not provision resources.",
+    "prepare-azure": "Inspect Azure deployment readiness; does not deploy or grant permissions.",
+    validate: "Run generated-file, npm quality, and optional Bicep checks.",
+    completion: "Print a shell completion script; install it using your shell's instructions.",
+  };
+  const usages: Record<HelpCommand, string> = {
+    create: "create <destination> [options]",
+    bootstrap: "bootstrap <destination> [options]",
+    wizard: "wizard [destination] [options]",
+    list: "list [--json]",
+    doctor: "doctor [project] [-C <path>] [--json]",
+    "prepare-azure": "prepare-azure [project] [--environment <name>] [--json]",
+    validate: "validate [project] [-C <path>] [--json]",
+    completion: "completion <powershell|bash|zsh|clink>",
+  };
+  const examples: Record<HelpCommand, string> = {
+    create: "create my-agent --template chat-agent-ts --yes",
+    bootstrap: "bootstrap my-agent --yes --no-install",
+    wizard: "wizard my-agent",
+    list: "list --json",
+    doctor: "doctor -C \"my agent\" --json",
+    "prepare-azure": "prepare-azure my-agent --environment dev",
+    validate: "validate my-agent --json",
+    completion: "completion powershell",
+  };
+  const creationOptions = helpText.split("Create options:\n")[1]!.split("\nGeneral options:")[0]!;
+  const filteredOptions = creationOptions.split("\n").filter((line) =>
+    command === "bootstrap" ||
+    !/--install|--link|--environment|--deploy|--azure-location|--entra-|--azure-setup/.test(line));
+  return [
+    `create-cosmos-agent ${command}`, descriptions[command],
+    `Usage:\n  create-cosmos-agent ${usages[command]}`,
+    ...(creation ? [`Options:\n${filteredOptions.join("\n")}`,
+      command !== "bootstrap" ? "  --azure-setup later|existing (provision requires bootstrap)" : "",
+      "  --yes accepts defaults, not overwrites or implicit billable deployment.",
+      "  Use create <destination> explicitly for command-like directory names."] : []),
+    ...(command === "doctor" || command === "validate" || command === "prepare-azure"
+      ? ["Options:\n  -C, --project <path>  Project directory\n  --json  Machine-readable output",
+        ...(command === "prepare-azure" ? ["  -e, --environment <name>  Azure environment"] : [])] : []),
+    "  -h, --help  Show this command's help",
+    `Example:\n  create-cosmos-agent ${examples[command]}`,
+  ].filter(Boolean).join("\n\n");
 }
 
 export function printNextSteps(plan: NextStepPlan): void {

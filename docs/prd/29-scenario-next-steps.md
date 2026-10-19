@@ -1,6 +1,7 @@
 # PRD: Truthful scenario-aware completion instructions
 
-Issue: #29. Priority: third onboarding foundation; independent of #23/#26.
+Issue: #29. Priority: third onboarding foundation. Stacked after #23/#26 to
+integrate shared CLI dispatch and preserve their additive JSON contracts.
 
 ## Outcome
 

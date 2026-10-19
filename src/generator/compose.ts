@@ -2,6 +2,7 @@ import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CliOptions } from "../cli/arguments.js";
+import { CliError, suggest } from "../cli/errors.js";
 import type { ProjectManifest, Scenario } from "./manifest.js";
 import { assertSafeDestination, validateGeneratedFiles } from "./validation.js";
 
@@ -50,7 +51,10 @@ export async function loadScenario(id: string): Promise<Scenario> {
     return JSON.parse(await readFile(scenarioPath, "utf8")) as Scenario;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`Unknown template "${id}". Run with --list to see supported templates.`);
+      const ids = (await readdir(join(sourceRoot, "scenarios")))
+        .filter((entry) => entry.endsWith(".json")).map((entry) => entry.slice(0, -5));
+      throw new CliError("CLI_UNKNOWN_TEMPLATE", "Unknown template. Run with --list to see supported templates.",
+        suggest(id, ids).map((match) => `Use --template ${match}.`));
     }
     throw error;
   }
