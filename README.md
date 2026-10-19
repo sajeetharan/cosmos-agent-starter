@@ -294,6 +294,15 @@ Generated production foundations include:
 
 ## Essential commands
 
+Use `npx create-cosmos-agent local-status .` inside a generated project to inspect
+local configuration without modifying files or starting services. After starting
+the application yourself, use `local-status . --check-connectivity --timeout 2000`
+for bounded API health, web HEAD, and applicable TCP probes. Missing values are
+reported by variable name, not value. `--json` reports configured/reachable/blocked
+status and individual findings; static success does not claim runtime readiness.
+Doctor remains the static safety check and prepare-azure remains the deployment
+readiness check. See the [local readiness PRD](docs/prd/27-local-readiness.md).
+
 Use `<command> --help` for a focused reference and example, including
 `create --help`, `bootstrap --help`, and `completion --help`. Typo suggestions
 are advisory and never executed. JSON errors preserve `status`/`message` and add
