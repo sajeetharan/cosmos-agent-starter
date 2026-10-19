@@ -269,6 +269,13 @@ Generated production foundations include:
 
 ## Essential commands
 
+Use `<command> --help` for a focused reference and example, including
+`create --help`, `bootstrap --help`, and `completion --help`. Typo suggestions
+are advisory and never executed. JSON errors preserve `status`/`message` and add
+stable `code` and `suggestions` fields on stderr (exit 1); see the
+[CLI help PRD](docs/prd/26-actionable-cli-help.md). Use `create <destination>`
+explicitly for directory names that resemble commands.
+
 | Command                                       | Purpose                                                          |
 | --------------------------------------------- | ---------------------------------------------------------------- |
 | `create-cosmos-agent wizard <name>`           | Create a project with guided choices                             |
