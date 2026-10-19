@@ -175,6 +175,13 @@ When you are ready for Azure
 
 ## One-command bootstrap
 
+Before writing files, create/bootstrap check Node.js 20+, npm, destination access,
+and Git when requested. Docker/Compose are required only for Cosmos emulator
+storage; azd is required only for deployment. Checks never install, sign in, or
+probe cloud services. Blocking findings stop generation; `--json` includes
+structured `preflight` findings. `--dry-run` remains an unchecked plan.
+See the [preflight PRD](docs/prd/23-scenario-preflight.md) for the output contract.
+
 Use `bootstrap` for a Neon-style project setup that scaffolds the application, installs
 dependencies, initializes Git, includes Copilot instructions and an on-demand
 [`cosmosdb-best-practices`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) Agent Skill, and
