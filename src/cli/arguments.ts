@@ -17,6 +17,7 @@ export type CliCommand =
   | "version";
 
 export interface CliOptions {
+  suppliedOptions?: (keyof CliOptions)[];
   command: CliCommand;
   destination?: string;
   projectDirectory: string;
@@ -392,6 +393,21 @@ export function parseArguments(rawArgs: string[]): CliOptions {
   }
 
   return {
+    suppliedOptions: [
+      ...args.flatMap((argument) => {
+        const key = valueFlags.get(argument);
+        return key ? [key] : [];
+      }),
+      ...(destination ? ["destination" as const] : []),
+      ...(["includeWeb", "initializeGit", "installDependencies", "linkProject", "deploy"] as const)
+        .filter((key) => ({
+          includeWeb: ["--web", "--no-web"],
+          initializeGit: ["--git", "--no-git"],
+          installDependencies: ["--install", "--no-install"],
+          linkProject: ["--link", "--no-link"],
+          deploy: ["--deploy"],
+        })[key].some((flag) => args.includes(flag))),
+    ],
     command,
     ...(destination ? { destination } : {}),
     projectDirectory,
