@@ -1,435 +1,222 @@
-import { createInterface, type Interface } from "node:readline/promises";
+import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import type {
-  AIProvider,
-  AuthMode,
-  AzureSetup,
-  Capacity,
-  CliOptions,
-  LocalMode,
-  StorageBackend,
-} from "./arguments.js";
+import { parseArguments, type CliOptions } from "./arguments.js";
+import { CliError } from "./errors.js";
 import { listScenarios } from "../generator/compose.js";
 import { resolveEnvironmentName } from "../generator/bootstrap.js";
-import {
-  badge,
-  box,
-  brandBanner,
-  style,
-  symbols,
-  type BadgeType,
-} from "./style.js";
+import type { Scenario } from "../generator/manifest.js";
+import { brandBanner, style } from "./style.js";
 
-interface Choice<T extends string> {
-  value: T;
+export interface WizardTerminal {
+  question: (prompt: string) => Promise<string>;
+  write: (message: string) => void;
+  close: () => void;
+}
+
+interface Field {
+  key: keyof CliOptions;
   label: string;
-  description: string;
-  badge?: BadgeType | undefined;
+  choices?: readonly string[];
 }
 
-interface StepMeta {
-  step?: string | undefined;
-  category?: string | undefined;
+function fields(options: CliOptions, scenarios: Scenario[]): Field[] {
+  const scenario = scenarios.find((item) => item.id === options.template);
+  const bootstrap = options.command === "bootstrap";
+  const cloud = options.provider === "azure-openai" ||
+    (options.storage === "cosmos" && options.localMode === "azure");
+  return [
+    { key: "destination", label: "Project destination" },
+    { key: "template", label: "Scenario template", choices: scenarios.map((item) => item.id) },
+    { key: "provider", label: "AI provider (mock needs no credentials)", choices: ["mock", "azure-openai", "openai", "ollama"] },
+    ...(!scenario?.capabilities.includes("event-driven") ? [
+      { key: "authMode" as const, label: "Development identity", choices: ["local", "entra"] },
+    ] : []),
+    { key: "storage", label: "Development storage (in-memory resets on restart)", choices: ["in-memory", "cosmos"] },
+    ...(options.storage === "cosmos" ? [
+      { key: "localMode" as const, label: "Cosmos connection", choices: ["emulator", "azure"] },
+    ] : []),
+    ...(options.storage === "cosmos" || options.deploy ? [
+      { key: "capacity" as const, label: "Azure capacity", choices: ["serverless", "autoscale"] },
+    ] : []),
+    ...(cloud ? [{
+      key: "azureSetup" as const, label: "Azure setup",
+      choices: bootstrap && options.provider === "azure-openai"
+        ? ["later", "existing", "provision"] : ["later", "existing"],
+    }] : []),
+    ...(options.azureSetup !== "later" && options.provider === "azure-openai" ? [
+      { key: "azureOpenAIEndpoint" as const, label: "Azure OpenAI HTTPS endpoint" },
+      { key: "azureOpenAIChatDeployment" as const, label: "Azure OpenAI chat deployment" },
+    ] : []),
+    ...(options.azureSetup === "existing" && options.storage === "cosmos" && options.localMode === "azure" ? [
+      { key: "cosmosEndpoint" as const, label: "Cosmos DB HTTPS endpoint" },
+    ] : []),
+    ...(options.azureSetup === "provision" ? [
+      { key: "azureLocation" as const, label: "Azure region" },
+      { key: "entraTenantId" as const, label: "Entra tenant ID" },
+      { key: "entraAudience" as const, label: "Entra API audience" },
+      { key: "entraClientId" as const, label: "Entra SPA client ID" },
+      { key: "entraScope" as const, label: "Entra API scope" },
+    ] : []),
+    ...(scenario?.capabilities.includes("react-web") ? [
+      { key: "includeWeb" as const, label: "Include React web application", choices: ["yes", "no"] },
+    ] : []),
+    { key: "initializeGit", label: "Initialize Git", choices: ["yes", "no"] },
+    ...(bootstrap ? [
+      { key: "installDependencies" as const, label: "Install dependencies", choices: ["yes", "no"] },
+      { key: "linkProject" as const, label: "Link local context", choices: ["yes", "no"] },
+      ...(options.linkProject ? [{ key: "environmentName" as const, label: "Environment name" }] : []),
+    ] : []),
+  ];
 }
 
-async function choose<T extends string>(
-  readline: Interface,
-  question: string,
-  choices: readonly Choice<T>[],
-  fallback: T,
-  meta?: StepMeta,
-): Promise<T> {
-  if (meta?.step) {
-    console.log(`\n${style.cyan(symbols.step)} ${style.bold(meta.step)}${meta.category ? ` ${style.dim(`· ${meta.category}`)}` : ""}`);
+function validateField(field: Field, value: string): void {
+  if (!value || /[\0\r\n]/.test(value)) throw new Error(`${field.label} is required and must be a single line.`);
+  if (field.key === "environmentName") resolveEnvironmentName(".", value);
+  if (field.key === "azureOpenAIEndpoint" || field.key === "cosmosEndpoint") {
+    try {
+      if (new URL(value).protocol !== "https:") throw new Error();
+    } catch {
+      throw new Error(`${field.label} must be an HTTPS URL.`);
+    }
   }
-  console.log(`  ${style.bold(question)}`);
-  for (const [index, choice] of choices.entries()) {
-    const isDefault = choice.value === fallback;
-    const defaultBadge = isDefault ? ` ${badge("default", "default")}` : "";
-    const extraBadge = choice.badge ? ` ${badge(choice.badge, choice.badge)}` : "";
-    const prefix = isDefault ? style.cyan("❯") : " ";
-    const num = isDefault ? style.cyan(String(index + 1)) : style.dim(String(index + 1));
-    const label = isDefault ? style.bold(choice.label) : choice.label;
-    console.log(`  ${prefix} ${num}. ${label}${defaultBadge}${extraBadge}`);
-    console.log(`       ${style.dim(choice.description)}`);
+}
+
+function validateOptions(options: CliOptions): void {
+  const args = [options.command, options.destination ?? "my-cosmos-agent", "--yes"];
+  const values = [
+    ["--template", options.template], ["--provider", options.provider],
+    ["--auth", options.authMode], ["--storage", options.storage],
+    ["--local", options.localMode], ["--capacity", options.capacity],
+    ["--azure-setup", options.azureSetup],
+    ["--azure-location", options.azureLocation],
+    ["--azure-openai-endpoint", options.azureOpenAIEndpoint],
+    ["--azure-openai-deployment", options.azureOpenAIChatDeployment],
+    ["--cosmos-endpoint", options.cosmosEndpoint],
+    ["--entra-tenant-id", options.entraTenantId], ["--entra-audience", options.entraAudience],
+    ["--entra-client-id", options.entraClientId], ["--entra-scope", options.entraScope],
+    ...(options.command === "bootstrap" ? [["--environment", options.environmentName]] : []),
+  ];
+  for (const [flag, value] of values) if (flag && value) args.push(flag, value);
+  if (options.command === "bootstrap") {
+    args.push(options.linkProject ? "--link" : "--no-link");
+    if (options.deploy) args.push("--deploy");
   }
-  const fallbackIndex = choices.findIndex((choice) => choice.value === fallback) + 1;
+  parseArguments(args);
+}
+
+export async function runWizard(options: CliOptions, terminal: WizardTerminal): Promise<CliOptions> {
+  const selected = { ...options };
+  selected.destination ??= "my-cosmos-agent";
+  const scenarios = await listScenarios();
+  const supplied = new Set(options.suppliedOptions ?? []);
+  const visited = new Set<keyof CliOptions>();
+  const history: (keyof CliOptions)[] = [];
+  let edit: keyof CliOptions | undefined;
+  terminal.write(`${brandBanner()}\n${style.bold("Guided setup")}\n` +
+    "Enter accepts the current value. Type back or cancel at any question.\n" +
+    "Explicit flags are retained. Use the final Edit menu to override them.\n" +
+    "Step totals update as conditional choices become relevant.");
   while (true) {
-    const answer = (await readline.question(
-      `  ${style.cyan(symbols.pointer)} Select an option [${fallbackIndex}]: `,
-    ))
-      .trim()
-      .toLowerCase();
-    if (!answer) {
-      const selected = choices.find((choice) => choice.value === fallback) ?? choices[fallbackIndex - 1]!;
-      console.log(`  ${style.green(symbols.check)} ${meta?.category ?? question} ${style.dim("›")} ${style.cyan(style.bold(selected.label))}\n`);
-      return fallback;
+    const visible = fields(selected, scenarios);
+    const pending = visible.filter((field) => !supplied.has(field.key));
+    const field = edit ? visible.find((item) => item.key === edit)
+      : pending.find((item) => !visited.has(item.key));
+    if (!field) {
+      terminal.write("Review before creating files:");
+      visible.forEach((item, index) => terminal.write(
+        `${index + 1}. ${item.label}: ${String(selected[item.key] ?? "(not configured)")}`,
+      ));
+      const action = (await terminal.question("1. Confirm  2. Edit  3. Cancel [1]: ")).trim().toLowerCase();
+      if (action === "3" || action === "cancel") throw cancelled();
+      if (action === "2" || action === "edit" || action === "back") {
+        const answer = await terminal.question(`Edit which field (1-${visible.length}), or back? `);
+        if (answer.trim().toLowerCase() === "cancel") throw cancelled();
+        const index = /^\d+$/.test(answer.trim()) ? Number(answer.trim()) - 1 : -1;
+        if (!visible[index]) { terminal.write("Choose a listed field number."); continue; }
+        edit = visible[index].key;
+        continue;
+      }
+      if (action !== "" && action !== "1" && action !== "confirm") {
+        terminal.write("Choose Confirm, Edit, or Cancel."); continue;
+      }
+      try {
+        validateOptions(selected);
+      } catch (error) {
+        terminal.write(error instanceof Error ? error.message : String(error));
+        continue;
+      }
+      if (selected.deploy || selected.azureSetup === "provision") {
+        const consent = (await terminal.question(
+          "Billable deployment requested. Type deploy to approve, back to edit, or cancel [cancel]: ",
+        )).trim().toLowerCase();
+        if (consent === "back") continue;
+        if (consent !== "deploy") throw cancelled();
+      }
+      return selected;
     }
-    const selectedIndex = Number.parseInt(answer, 10);
-    if (Number.isInteger(selectedIndex) && selectedIndex >= 1 && selectedIndex <= choices.length) {
-      const selected = choices[selectedIndex - 1]!;
-      console.log(`  ${style.green(symbols.check)} ${meta?.category ?? question} ${style.dim("›")} ${style.cyan(style.bold(selected.label))}\n`);
-      return selected.value;
+    const position = pending.findIndex((item) => item.key === field.key);
+    terminal.write(`${edit ? "Editing" : `Step ${position + 1} of ${pending.length}`}: ${field.label}`);
+    field.choices?.forEach((choice, index) => terminal.write(`  ${index + 1}. ${choice}`));
+    const current = selected[field.key] ??
+      (field.key === "environmentName" ? resolveEnvironmentName(selected.destination!) : "");
+    const fallback = typeof current === "boolean" ? current ? "yes" : "no" : String(current);
+    const answer = (await terminal.question(`${field.label} [${fallback}]: `)).trim();
+    if (answer.toLowerCase() === "cancel") throw cancelled();
+    if (answer.toLowerCase() === "back") {
+      const previous = history.pop();
+      if (previous) { visited.delete(previous); edit = previous; }
+      else terminal.write("Already at the first question.");
+      continue;
     }
-    const selected = choices.find((choice) => choice.value.toLowerCase() === answer);
-    if (selected) {
-      console.log(`  ${style.green(symbols.check)} ${meta?.category ?? question} ${style.dim("›")} ${style.cyan(style.bold(selected.label))}\n`);
-      return selected.value;
+    let value = answer || fallback;
+    if (field.choices) {
+      if (/^\d+$/.test(value)) value = field.choices[Number(value) - 1] ?? "";
+      if (!field.choices.includes(value)) {
+        terminal.write("Choose a listed number or option value."); continue;
+      }
     }
-    console.log(`  ${style.yellow(symbols.warn)} Choose a number from 1 to ${choices.length} or enter an option value.`);
+    try {
+      validateField(field, value);
+    } catch (error) {
+      terminal.write(error instanceof Error ? error.message : String(error)); continue;
+    }
+    Object.assign(selected, { [field.key]: typeof current === "boolean" ? value === "yes" : value });
+    if (field.key === "azureSetup") selected.deploy = value === "provision" || Boolean(options.deploy);
+    visited.add(field.key);
+    history.push(field.key);
+    edit = undefined;
   }
 }
 
-async function askValue(
-  readline: Interface,
-  question: string,
-  configured?: string,
-  fallback?: string,
-  meta?: StepMeta,
-): Promise<string> {
-  if (configured?.trim()) return configured.trim();
-  if (meta?.step) {
-    console.log(`\n${style.cyan(symbols.step)} ${style.bold(meta.step)}${meta.category ? ` ${style.dim(`· ${meta.category}`)}` : ""}`);
-  }
-  const suffix = fallback ? style.dim(` [${fallback}]`) : "";
-  const value = (await readline.question(`  ${style.cyan(symbols.pointer)} ${question}${suffix}: `)).trim() || fallback;
-  if (!value) throw new Error(`${question} is required.`);
-  console.log(`  ${style.green(symbols.check)} ${meta?.category ?? question} ${style.dim("›")} ${style.cyan(style.bold(value))}\n`);
-  return value;
-}
-
-function requireHttpsUrl(value: string, label: string): string {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:") throw new Error();
-    return url.toString().replace(/\/$/, "");
-  } catch {
-    throw new Error(`${label} must be an HTTPS URL.`);
-  }
+function cancelled(): CliError {
+  return new CliError("CLI_CANCELLED", "Setup cancelled before filesystem changes.", ["Run wizard again when ready."]);
 }
 
 export async function completeInteractiveOptions(options: CliOptions): Promise<CliOptions> {
   if (options.yes) return options;
+  if (!stdin.isTTY || !stdout.isTTY) {
+    throw new CliError("CLI_NON_INTERACTIVE", "Interactive setup requires a terminal.",
+      ["Supply a destination and --yes to explicitly accept defaults, or use --dry-run."]);
+  }
   const readline = createInterface({ input: stdin, output: stdout });
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  readline.once("SIGINT", abort);
+  readline.once("close", abort);
   try {
-    console.log(`\n${brandBanner()}`);
-    const setupTitle = options.command === "bootstrap" ? "Bootstrap Guided Setup" : "Guided Agent Setup";
-    console.log(`\n${style.bold(style.cyan(`✦ ${setupTitle}`))} ${style.dim("· Press Enter to accept recommended defaults")}`);
-
-    const hasDestination = Boolean(options.destination);
-    const totalSteps = (hasDestination ? 0 : 1) + 7 + (options.command === "bootstrap" ? 2 : 0);
-    let stepIndex = 1;
-
-    let destination = options.destination;
-    if (!destination) {
-      console.log(`\n${style.cyan(symbols.step)} ${style.bold(`Step ${stepIndex} of ${totalSteps}`)} ${style.dim("· Project Destination")}`);
-      console.log(`  Where should your agent project be created?`);
-      const answer = (await readline.question(`  ${style.cyan(symbols.pointer)} Destination [my-cosmos-agent]: `)).trim();
-      destination = answer || "my-cosmos-agent";
-      console.log(`  ${style.green(symbols.check)} Project Destination ${style.dim("›")} ${style.cyan(style.bold(destination))}`);
-      stepIndex += 1;
-    }
-
-    const scenarios = await listScenarios();
-    const template = await choose(
-      readline,
-      "What do you want to build?",
-      scenarios.map((scenario) => ({
-        value: scenario.id,
-        label: scenario.name,
-        description: scenario.description,
-        badge: scenario.id === "chat-agent-ts" ? "recommended" : undefined,
-      })),
-      options.template,
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Scenario Template" },
-    );
-    const provider = await choose<AIProvider>(
-      readline,
-      "Which AI provider should local development use?",
-      [
-        {
-          value: "mock",
-          label: "Local deterministic provider",
-          description: "Starts immediately without credentials; development only.",
-          badge: "local",
-        },
-        {
-          value: "azure-openai",
-          label: "Azure OpenAI",
-          description: "Uses DefaultAzureCredential or an explicit development key.",
-          badge: "production",
-        },
-        {
-          value: "openai",
-          label: "OpenAI",
-          description: "Uses an OpenAI API key and configurable model.",
-        },
-        {
-          value: "ollama",
-          label: "Ollama",
-          description: "Runs with a local or remote Ollama model server.",
-          badge: "local",
-        },
-      ],
-      options.provider,
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "AI Model Provider" },
-    );
-    const authMode = await choose<AuthMode>(
-      readline,
-      "How should users authenticate during development?",
-      [
-        {
-          value: "local",
-          label: "Local development identity",
-          description: "Uses trusted tenant and user headers; blocked in production.",
-          badge: "local",
-        },
-        {
-          value: "entra",
-          label: "Microsoft Entra ID",
-          description: "Validates bearer tokens and enables MSAL sign-in in the React UI.",
-          badge: "production",
-        },
-      ],
-      options.authMode,
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Authentication Strategy" },
-    );
-    const storage = await choose<StorageBackend>(
-      readline,
-      "Where should development data be stored?",
-      [
-        {
-          value: "in-memory",
-          label: "In-memory",
-          description: "Zero configuration and resets when the API restarts.",
-          badge: "local",
-        },
-        {
-          value: "cosmos",
-          label: "Azure Cosmos DB",
-          description: "Durable memory, knowledge, tickets, and action state.",
-          badge: "durable",
-        },
-      ],
-      options.storage,
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Data Storage" },
-    );
-    const localMode = await choose<LocalMode>(
-      readline,
-      "Which Cosmos DB connection should configuration target?",
-      [
-        {
-          value: "emulator",
-          label: "Local emulator",
-          description: "Gateway connection with an emulator-only key.",
-          badge: "local",
-        },
-        {
-          value: "azure",
-          label: "Azure",
-          description: "Managed identity through DefaultAzureCredential.",
-          badge: "production",
-        },
-      ],
-      options.localMode,
-      { step: `Cosmos DB Connection`, category: "Connection Target" },
-    );
-    const capacity = await choose<Capacity>(
-      readline,
-      "Which Azure Cosmos DB capacity model should infrastructure use?",
-      [
-        {
-          value: "serverless",
-          label: "Serverless",
-          description: "Best for intermittent development and lower-volume workloads.",
-          badge: "recommended",
-        },
-        {
-          value: "autoscale",
-          label: "Autoscale",
-          description: "Best for variable production traffic with throughput guarantees.",
-          badge: "production",
-        },
-      ],
-      options.capacity,
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Cosmos DB Capacity" },
-    );
-    const usesAzureResources =
-      provider === "azure-openai" || (storage === "cosmos" && localMode === "azure");
-    let azureSetup = options.azureSetup;
-    let azureLocation = options.azureLocation;
-    let azureOpenAIEndpoint = options.azureOpenAIEndpoint;
-    let azureOpenAIChatDeployment = options.azureOpenAIChatDeployment;
-    let cosmosEndpoint = options.cosmosEndpoint;
-    let entraTenantId = options.entraTenantId;
-    let entraAudience = options.entraAudience;
-    let entraClientId = options.entraClientId;
-    let entraScope = options.entraScope;
-    let environmentName = options.environmentName;
-    let deploy = options.deploy;
-    if (usesAzureResources) {
-      const setupChoices: Choice<AzureSetup>[] = [
-        {
-          value: "existing",
-          label: "Use existing Azure resources",
-          description: "Configure live resource endpoints in the generated project.",
-        },
-        ...(options.command === "bootstrap" && provider === "azure-openai" ? [{
-          value: "provision" as const,
-          label: "Provision application infrastructure with azd",
-          description: "Creates billable Cosmos DB, Container Apps, identity, and monitoring resources; model deployment remains bring-your-own.",
-        }] : []),
-        {
-          value: "later",
-          label: "Configure Azure later",
-          description: "Generate placeholders and continue without connecting to live resources.",
-        },
-      ];
-      azureSetup = await choose(
-        readline,
-        "How should Azure resources be configured?",
-        setupChoices,
-        options.deploy ? "provision" : "existing",
-      );
-      if (azureSetup === "provision") {
-        const confirmation = await choose(
-          readline,
-          "Provision billable Azure resources after generation?",
-          [
-            { value: "no", label: "No", description: "Generate the project without creating resources." },
-            { value: "yes", label: "Yes", description: "Authenticate with Azure and run azd up after readiness checks." },
-          ],
-          "no",
-        );
-        if (confirmation === "no") azureSetup = "later";
-      }
-      if (azureSetup !== "later" && provider === "azure-openai") {
-        azureOpenAIEndpoint = requireHttpsUrl(await askValue(
-          readline,
-          "Azure OpenAI endpoint",
-          azureOpenAIEndpoint,
-        ), "Azure OpenAI endpoint");
-        azureOpenAIChatDeployment = await askValue(
-          readline,
-          "Azure OpenAI chat deployment name",
-          azureOpenAIChatDeployment,
-        );
-      }
-      if (azureSetup === "existing" && storage === "cosmos" && localMode === "azure") {
-        cosmosEndpoint = requireHttpsUrl(await askValue(
-          readline,
-          "Azure Cosmos DB endpoint",
-          cosmosEndpoint,
-        ), "Azure Cosmos DB endpoint");
-      }
-      if (azureSetup === "provision") {
-        deploy = true;
-        environmentName = await askValue(
-          readline,
-          "Azure environment name",
-          environmentName,
-          resolveEnvironmentName(destination),
-        );
-        azureLocation = await askValue(readline, "Azure location", azureLocation, "eastus2");
-        entraTenantId = await askValue(readline, "Microsoft Entra tenant ID", entraTenantId);
-        entraAudience = await askValue(readline, "Microsoft Entra API audience", entraAudience);
-        entraClientId = await askValue(readline, "Microsoft Entra SPA client ID", entraClientId);
-        entraScope = await askValue(readline, "Microsoft Entra API scope", entraScope);
-      } else {
-        deploy = false;
-      }
-    }
-    const web = await choose(
-      readline,
-      "Include the React customer application?",
-      [
-        { value: "yes", label: "Yes", description: "Chat, knowledge, support, agents, and operations UI.", badge: "recommended" },
-        { value: "no", label: "No", description: "Generate an API-only project." },
-      ],
-      options.includeWeb ? "yes" : "no",
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "React Web Portal" },
-    );
-    const git = await choose(
-      readline,
-      "Initialize a Git repository?",
-      [
-        { value: "yes", label: "Yes", description: "Create a new local Git repository.", badge: "recommended" },
-        { value: "no", label: "No", description: "Leave source control initialization to you." },
-      ],
-      options.initializeGit ? "yes" : "no",
-      { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Version Control" },
-    );
-    const install = options.command === "bootstrap"
-      ? await choose(
-          readline,
-          "Install project dependencies?",
-          [
-            { value: "yes", label: "Yes", description: "Run npm install after scaffolding.", badge: "recommended" },
-            { value: "no", label: "No", description: "Install dependencies later." },
-          ],
-          options.installDependencies ? "yes" : "no",
-          { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Dependencies" },
-        )
-      : "no";
-    const link = options.command === "bootstrap"
-      ? await choose(
-          readline,
-          "Link this directory to a local Cosmos Agent project context?",
-          [
-            { value: "yes", label: "Yes", description: "Create local environment context for Azure deployment.", badge: "recommended" },
-            { value: "no", label: "No", description: "Leave the generated directory unlinked." },
-          ],
-          options.linkProject ? "yes" : "no",
-          { step: `Step ${stepIndex++} of ${totalSteps}`, category: "Project Link" },
-        )
-      : "no";
-    if (deploy && link !== "yes") {
-      throw new Error("Azure provisioning requires a linked project context.");
-    }
-
-    const selectedScenario = scenarios.find((s) => s.id === template);
-    const summaryItems = [
-      `${style.bold("Destination:")}    ${destination}`,
-      `${style.bold("Scenario:")}       ${selectedScenario?.name ?? template} ${style.dim(`(${template})`)}`,
-      `${style.bold("AI Provider:")}    ${provider}`,
-      `${style.bold("Auth Strategy:")}  ${authMode === "entra" ? "Microsoft Entra ID" : "Local Development Identity"}`,
-      `${style.bold("Data Storage:")}   ${storage === "cosmos" ? `Azure Cosmos DB (${localMode})` : "In-memory"}`,
-      `${style.bold("Capacity:")}       ${capacity}`,
-      `${style.bold("Web Portal:")}     ${web === "yes" ? style.green("Included (React + Vite)") : style.dim("Excluded (API only)")}`,
-      `${style.bold("Git Repository:")} ${git === "yes" ? style.green("Initialized") : style.dim("Skipped")}`,
-      ...(options.command === "bootstrap" ? [
-        `${style.bold("Dependencies:")}   ${install === "yes" ? style.green("Install via npm") : style.dim("Skipped")}`,
-        `${style.bold("Project Link:")}   ${link === "yes" ? style.green(`Linked (${environmentName || "local"})`) : style.dim("Skipped")}`,
-        ...(deploy ? [`${style.bold("Azure Deploy:")}   ${style.cyan("azd up after generation")}`] : []),
-      ] : []),
-    ];
-    console.log(`\n${box(summaryItems, "Configuration Summary", style.cyan)}`);
-
-    return {
-      ...options,
-      destination,
-      template,
-      provider,
-      authMode,
-      storage,
-      localMode,
-      capacity,
-      includeWeb: web === "yes",
-      initializeGit: git === "yes",
-      installDependencies: install === "yes",
-      linkProject: link === "yes",
-      deploy,
-      azureSetup,
-      ...(environmentName ? { environmentName } : {}),
-      ...(azureLocation ? { azureLocation } : {}),
-      ...(azureOpenAIEndpoint ? { azureOpenAIEndpoint } : {}),
-      ...(azureOpenAIChatDeployment ? { azureOpenAIChatDeployment } : {}),
-      ...(cosmosEndpoint ? { cosmosEndpoint } : {}),
-      ...(entraTenantId ? { entraTenantId } : {}),
-      ...(entraAudience ? { entraAudience } : {}),
-      ...(entraClientId ? { entraClientId } : {}),
-      ...(entraScope ? { entraScope } : {}),
-    };
+    return await runWizard(options, {
+      question: async (prompt) => {
+        if (controller.signal.aborted) throw cancelled();
+        try {
+          return await readline.question(prompt, { signal: controller.signal });
+        } catch (error) {
+          if (controller.signal.aborted) throw cancelled();
+          throw error;
+        }
+      },
+      write: (message) => console.log(message),
+      close: () => readline.close(),
+    });
   } finally {
     readline.close();
   }

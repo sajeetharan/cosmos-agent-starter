@@ -134,6 +134,14 @@ so maintainers can feature verified community projects here.
 
 ## Guided setup
 
+The wizard accepts numbered options, `back`, and `cancel`. Invalid values retry
+in place. Its final review offers Confirm/Edit/Cancel before files are written;
+Edit can override explicit flags, which otherwise skip their questions.
+Step totals update when conditional questions change. Noninteractive terminals
+must use `--yes` (explicit default consent) or `--dry-run`. Neither authorizes
+overwrites. Interactive billable deployment requires separate typed approval.
+See [wizard requirements](docs/prd/24-wizard-navigation.md).
+
 Use the wizard to choose the scenario, model provider, authentication, storage, capacity, and web
 experience:
 
