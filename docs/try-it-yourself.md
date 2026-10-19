@@ -14,18 +14,18 @@ deterministic, so no model credentials or Azure subscription are required.
 
 ## 1. Install the CLI
 
-Download the latest release package `create-cosmos-agent-0.5.4.tgz` from GitHub Releases:
+Download the release package `create-cosmos-agent-0.6.0.tgz` from GitHub Releases:
 
 ```cmd
 mkdir C:\Demos
 cd /d C:\Demos
-curl -LO https://github.com/sajeetharan/cosmos-agent-starter/releases/download/v0.5.4/create-cosmos-agent-0.5.4.tgz
-npm install --global create-cosmos-agent-0.5.4.tgz
+curl -LO https://github.com/sajeetharan/cosmos-agent-starter/releases/download/v0.6.0/create-cosmos-agent-0.6.0.tgz
+npm install --global create-cosmos-agent-0.6.0.tgz
 create-cosmos-agent --version
 ```
 
 Alternatively, you can install the tarball from your local copy or internal share. The final command
-should print `0.5.4`. npm extracts the tarball automatically during installation.
+should print `0.6.0`. npm extracts the tarball automatically during installation.
 
 ### Optional: Enable Tab completion
 
@@ -56,9 +56,11 @@ create-cosmos-agent bootstrap
 The CLI explains each choice. Use these answers:
 
 - **Project destination:** `team-agent`
-- **What do you want to build?** Customer-ready conversational agent
-- **Where should development data be stored?** Azure Cosmos DB
+- **Scenario template:** `chat-agent-ts` (customer-ready conversational agent)
+- **Development storage:** `cosmos`
+- **Cosmos connection:** `emulator`
 - Accept the displayed defaults for the remaining choices.
+- Confirm the final review. Use Edit to revise a choice or Cancel to exit without writing files.
 
 Bootstrap creates the API and React app, installs dependencies, initializes Git, and adds the local
 project context. The default local path does not create Azure resources. If Azure-backed AI or storage
@@ -137,7 +139,7 @@ Stop `npm run dev` with `Ctrl+C`, then run:
 npm run emulator:stop
 cd ..
 rmdir /s /q team-agent
-del /q create-cosmos-agent-0.5.4.tgz
+del /q create-cosmos-agent-0.6.0.tgz
 ```
 
 The globally installed CLI remains available. Remove it with
