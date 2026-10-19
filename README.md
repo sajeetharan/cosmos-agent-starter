@@ -305,6 +305,14 @@ Open a new Command Prompt. `Tab` now completes commands, options, templates, and
 
 ## Validate a generated project
 
+Validation reports each stage with status, duration, and a reproduction command
+for failures. Declared scenario tests run alongside typecheck/build/unit/security/
+cost checks; live integration remains opt-in. Missing optional Azure/Bicep tools
+are reported as unavailable, not verified; an actual infrastructure check failure
+returns nonzero. JSON preserves existing fields and adds `schemaVersion` and
+`stages`. Human output shows stage summaries rather than subprocess chatter.
+See the [validation PRD](docs/prd/28-validation-stage-reports.md) for the contract.
+
 ```powershell
 npm run typecheck
 npm test

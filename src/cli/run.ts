@@ -17,13 +17,14 @@ import {
   nextSteps,
   printFindings,
   printAzureReadiness,
+  printValidationStage,
   printNextSteps,
   summarizeFindings,
 } from "./output.js";
 import { brandBanner, statusTag, style } from "./style.js";
 import { composeProject, listScenarios, loadScenario } from "../generator/compose.js";
 import { runDoctor } from "../generator/doctor.js";
-import { validateProject } from "../generator/validate.js";
+import { validateProjectDetailed } from "../generator/validate.js";
 import { bootstrapProject } from "../generator/bootstrap.js";
 import { runAzureReadiness } from "../generator/azure-readiness.js";
 import { CliError, invalidChoice, redactError } from "./errors.js";
@@ -121,16 +122,19 @@ export async function runCli(args: string[]): Promise<number> {
     }
     if (options.command === "validate") {
       const project = resolve(options.projectDirectory);
-      const exitCode = await validateProject(project, { silent: options.json });
+      const result = await validateProjectDetailed(project, {
+        silent: options.json,
+        onStage: printValidationStage,
+      });
       if (options.json) {
         writeJson({
           command: "validate",
           project,
-          status: exitCode === 0 ? "passed" : "failed",
-          exitCode,
+          status: result.exitCode === 0 ? "passed" : "failed",
+          ...result,
         });
       }
-      return exitCode;
+      return result.exitCode;
     }
     if (options.json && !options.destination) {
       throw new Error("JSON scaffolding requires a destination.");
