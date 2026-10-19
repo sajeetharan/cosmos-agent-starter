@@ -46,7 +46,7 @@ export function invalidChoice(name: string, value: string, choices: string[]): C
 export function redactError(message: string): string {
   return message
     .replace(/(Bearer\s+)\S+/gi, "$1[REDACTED]")
-    .replace(/((?:api[-_]?key|accountkey|password|secret|token)\s*[=:]\s*)[^\s;,"']+/gi, "$1[REDACTED]")
+    .replace(/((?:api[-_]?key|accountkey|password|secret|token)\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s;,"']+)/gi, "$1[REDACTED]")
     .replace(/(https?:\/\/)[^/\s@]+@/gi, "$1[REDACTED]@")
     .slice(0, 2000);
 }

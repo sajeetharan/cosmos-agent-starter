@@ -57,6 +57,8 @@ describe("focused help and actionable errors", () => {
     expect(String(error.mock.calls[0]?.[0])).not.toContain("private-value");
     const redacted = redactError("token=abc API_KEY=def AccountKey=ghi; Bearer xyz https://user:pwd@example.com");
     for (const secret of ["abc", "def", "ghi", "xyz", "user:pwd"]) expect(redacted).not.toContain(secret);
+    expect(redactError('API_KEY="quoted secret value" password=\'another secret\''))
+      .toBe("API_KEY=[REDACTED] password=[REDACTED]");
     expect(redactError("x".repeat(3000))).toHaveLength(2000);
     expect(suggest("unrelated-value", ["mock"])).toEqual([]);
   });
