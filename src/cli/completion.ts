@@ -11,6 +11,7 @@ const commands: CompletionCandidate[] = [
   { value: "wizard", description: "Create a project with guided choices" },
   { value: "create", description: "Create a project" },
   { value: "bootstrap", description: "Scaffold, install, link, and optionally deploy a configured project" },
+  { value: "resume-bootstrap", description: "Resume recorded setup without overwriting source files" },
   { value: "list", description: "List scenario templates" },
   { value: "doctor", description: "Inspect security and configuration" },
   { value: "prepare-azure", description: "Check Azure deployment readiness" },

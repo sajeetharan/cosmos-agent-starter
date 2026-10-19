@@ -29,6 +29,7 @@ import { runAzureReadiness } from "../generator/azure-readiness.js";
 import { buildNextStepPlan, nextSteps } from "./next-steps.js";
 import { CliError, invalidChoice, redactError } from "./errors.js";
 import { runPreflight } from "../generator/preflight.js";
+import { resumeBootstrap } from "../generator/resume.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -137,6 +138,19 @@ export async function runCli(args: string[]): Promise<number> {
       }
       return result.exitCode;
     }
+    if (options.command === "resume-bootstrap") {
+      const project = resolve(options.projectDirectory);
+      const result = await resumeBootstrap(project, {
+        deploy: options.deploy, silent: options.json,
+        onProgress: ({ status, message, elapsedMs }) => console.log(
+          `${statusTag(status === "completed" ? "success" : "info")} ${message}` +
+          (elapsedMs === undefined ? "" : ` (${Math.round(elapsedMs)} ms)`),
+        ),
+      });
+      if (options.json) writeJson({ command: "resume-bootstrap", status: "resumed", ...result });
+      else console.log(`${statusTag("success")} Bootstrap resumed. Source files and environment values were preserved.`);
+      return 0;
+    }
     if (options.json && !options.destination) {
       throw new Error("JSON scaffolding requires a destination.");
     }
@@ -212,8 +226,9 @@ export async function runCli(args: string[]): Promise<number> {
         deploy: options.deploy,
         ...(options.environmentName ? { environmentName: options.environmentName } : {}),
         silent: options.json,
-        onProgress: ({ status, message }) => {
-          console.log(`${statusTag(status === "completed" ? "success" : "info")} ${message}`);
+        onProgress: ({ status, message, elapsedMs }) => {
+          console.log(`${statusTag(status === "completed" ? "success" : "info")} ${message}` +
+            (elapsedMs === undefined ? "" : ` (${Math.round(elapsedMs)} ms)`));
         },
         ...(options.azureSetup === "provision" ? {
           azureProvisioning: {

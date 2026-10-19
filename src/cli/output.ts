@@ -9,6 +9,7 @@ export const helpText = `create-cosmos-agent - scaffold secure Azure Cosmos DB a
 Usage:
   create-cosmos-agent [create] <destination> [options]
   create-cosmos-agent bootstrap <destination> [options]
+  create-cosmos-agent resume-bootstrap [project] [--deploy] [--json]
   create-cosmos-agent list [--json]
   create-cosmos-agent doctor [project] [--json]
   create-cosmos-agent prepare-azure [project] [--environment <name>] [--json]
@@ -18,6 +19,7 @@ Usage:
 Commands:
   create [destination]  Create a project (default command)
   bootstrap [destination] Scaffold, install, link, and optionally deploy a configured project
+  resume-bootstrap [project] Resume setup without regenerating files; deployment is opt-in
   wizard [destination]  Create with a descriptive guided setup
   list                  List available templates
   doctor [project]      Report security and configuration findings
@@ -71,7 +73,7 @@ Examples:
   create-cosmos-agent prepare-azure ./my-agent --environment my-agent-dev
   create-cosmos-agent validate -C ./my-agent --json`;
 
-export const helpCommands = ["create", "bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"] as const;
+export const helpCommands = ["create", "bootstrap", "resume-bootstrap", "wizard", "list", "doctor", "prepare-azure", "validate", "completion"] as const;
 export type HelpCommand = typeof helpCommands[number];
 
 export function formatHelp(command?: HelpCommand): string {
@@ -80,6 +82,7 @@ export function formatHelp(command?: HelpCommand): string {
   const descriptions: Record<HelpCommand, string> = {
     create: "Scaffold files only; install dependencies yourself. Use bootstrap to install and link too.",
     bootstrap: "Scaffold, install dependencies, initialize Git, and link local context. Deployment requires --deploy and may be billable.",
+    "resume-bootstrap": "Resume recorded setup without regenerating source or environment files. Rechecks prerequisites and completed stages; never retries uncertain deployment.",
     wizard: "Guided create with descriptive prompts. Unlike bootstrap, it does not install dependencies.",
     list: "List supported scenario templates.",
     doctor: "Inspect generated-project security and configuration; does not provision resources.",
@@ -90,6 +93,7 @@ export function formatHelp(command?: HelpCommand): string {
   const usages: Record<HelpCommand, string> = {
     create: "create <destination> [options]",
     bootstrap: "bootstrap <destination> [options]",
+    "resume-bootstrap": "resume-bootstrap [project] [-C <path>] [--deploy] [--json]",
     wizard: "wizard [destination] [options]",
     list: "list [--json]",
     doctor: "doctor [project] [-C <path>] [--json]",
@@ -100,6 +104,7 @@ export function formatHelp(command?: HelpCommand): string {
   const examples: Record<HelpCommand, string> = {
     create: "create my-agent --template chat-agent-ts --yes",
     bootstrap: "bootstrap my-agent --yes --no-install",
+    "resume-bootstrap": "resume-bootstrap -C \"my agent\" --json",
     wizard: "wizard my-agent",
     list: "list --json",
     doctor: "doctor -C \"my agent\" --json",
@@ -118,9 +123,10 @@ export function formatHelp(command?: HelpCommand): string {
       command !== "bootstrap" ? "  --azure-setup later|existing (provision requires bootstrap)" : "",
       "  --yes accepts defaults, not overwrites or implicit billable deployment.",
       "  Use create <destination> explicitly for command-like directory names."] : []),
-    ...(command === "doctor" || command === "validate" || command === "prepare-azure"
+    ...(command === "doctor" || command === "validate" || command === "prepare-azure" || command === "resume-bootstrap"
       ? ["Options:\n  -C, --project <path>  Project directory\n  --json  Machine-readable output",
         ...(command === "prepare-azure" ? ["  -e, --environment <name>  Azure environment"] : [])] : []),
+    ...(command === "resume-bootstrap" ? ["  --deploy  Explicit deployment intent (billable); uncertain prior deployment must be reconciled manually."] : []),
     "  -h, --help  Show this command's help",
     `Example:\n  create-cosmos-agent ${examples[command]}`,
   ].filter(Boolean).join("\n\n");
