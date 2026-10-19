@@ -1,5 +1,6 @@
 import type { DoctorFinding } from "../generator/doctor.js";
 import type { AzureReadinessFinding } from "../generator/azure-readiness.js";
+import type { ValidationStage } from "../generator/validate.js";
 import { brandBanner, statusTag, style } from "./style.js";
 import type { NextStepPlan } from "./next-steps.js";
 
@@ -143,6 +144,16 @@ export function summarizeFindings(findings: DoctorFinding[]) {
     warnings: findings.filter((finding) => finding.severity === "warning").length,
     information: findings.filter((finding) => finding.severity === "info").length,
   };
+}
+
+export function printValidationStage(stage: ValidationStage): void {
+  const severity = stage.status === "passed" ? "success"
+    : stage.status === "failed" || (stage.required && stage.status === "unavailable")
+      ? "error" : stage.status === "unavailable" ? "warning" : "info";
+  console.log(`${statusTag(severity)} ${stage.code}: ${stage.status} (${Math.round(stage.durationMs)} ms)`);
+  if (stage.reason) console.log(`  ${stage.reason}`);
+  if (stage.summary) console.log(`  ${stage.summary}`);
+  if (stage.command && stage.status !== "passed") console.log(`  From the project directory: ${stage.command}`);
 }
 
 export function printFindings(findings: DoctorFinding[]): void {
