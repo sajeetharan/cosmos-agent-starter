@@ -175,6 +175,13 @@ When you are ready for Azure
 
 ## One-command bootstrap
 
+Before writing files, create/bootstrap check Node.js 20+, npm, destination access,
+and Git when requested. Docker/Compose are required only for Cosmos emulator
+storage; azd is required only for deployment. Checks never install, sign in, or
+probe cloud services. Blocking findings stop generation; `--json` includes
+structured `preflight` findings. `--dry-run` remains an unchecked plan.
+See the [preflight PRD](docs/prd/23-scenario-preflight.md) for the output contract.
+
 Use `bootstrap` for a Neon-style project setup that scaffolds the application, installs
 dependencies, initializes Git, includes Copilot instructions and an on-demand
 [`cosmosdb-best-practices`](https://github.com/AzureCosmosDB/cosmosdb-agent-kit) Agent Skill, and
@@ -203,6 +210,14 @@ Use `--no-install`, `--no-git`, or `--no-link` to skip individual setup steps. T
 stored in `.cosmos-agent/context.json` and excluded from Git.
 
 ## Scaffold without installing dependencies
+
+Completion instructions are scenario-aware and start by entering the generated
+directory. They include `npm install` only if bootstrap did not install, show a
+web URL only when a web app exists, and explain API-only or stdin-worker startup.
+Windows instructions target PowerShell; macOS/Linux instructions target Bash/Zsh.
+JSON retains `nextSteps` and adds the structured `nextStepPlan`; optional Azure
+commands are separate and deployment is marked billable. See the
+[next-steps PRD](docs/prd/29-scenario-next-steps.md) for the contract.
 
 The [starter table](#working-starters) uses `bootstrap` to install dependencies automatically.
 Use the create command directly when you want to scaffold first and install later:

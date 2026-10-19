@@ -14,7 +14,6 @@ import {
 import {
   formatHelp,
   helpCommands,
-  nextSteps,
   printFindings,
   printAzureReadiness,
   printValidationStage,
@@ -27,7 +26,9 @@ import { runDoctor } from "../generator/doctor.js";
 import { validateProjectDetailed } from "../generator/validate.js";
 import { bootstrapProject } from "../generator/bootstrap.js";
 import { runAzureReadiness } from "../generator/azure-readiness.js";
+import { buildNextStepPlan, nextSteps } from "./next-steps.js";
 import { CliError, invalidChoice, redactError } from "./errors.js";
+import { runPreflight } from "../generator/preflight.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -181,6 +182,19 @@ export async function runCli(args: string[]): Promise<number> {
       }
       return 0;
     }
+    const preflight = await runPreflight(options);
+    if (!options.json) {
+      for (const finding of preflight.findings) {
+        console.log(`${statusTag(finding.severity)} ${finding.code} ${finding.message}`);
+        if (finding.severity !== "info") console.log(`  Next: ${finding.remediation}`);
+      }
+    }
+    if (!preflight.ready) {
+      if (options.json) writeJson({
+        command: options.command, status: "blocked", destination, preflight,
+      });
+      return 1;
+    }
     if (!options.json) {
       console.log(`\n${statusTag("info")} Generating project files...`);
     }
@@ -188,7 +202,6 @@ export async function runCli(args: string[]): Promise<number> {
     if (!options.json) {
       console.log(`${statusTag("success")} Project files generated`);
     }
-    const includeWeb = scenario.capabilities.includes("react-web") && options.includeWeb;
     if (options.command === "bootstrap") {
       const result = await bootstrapProject({
         destination: created,
@@ -215,20 +228,15 @@ export async function runCli(args: string[]): Promise<number> {
           },
         } : {}),
       });
+      const nextStepPlan = buildNextStepPlan(created, scenario, options, result);
       if (options.json) {
         writeJson({
           command: "bootstrap",
           status: result.deployed ? "deployed" : "bootstrapped",
           ...result,
-          nextSteps: [
-            "npm run dev",
-            ...(!result.deployed && result.environmentName
-              ? [
-                  `npx create-cosmos-agent prepare-azure . --environment ${result.environmentName}`,
-                  `azd up --environment ${result.environmentName}`,
-                ]
-              : []),
-          ],
+          preflight,
+          nextSteps: nextSteps(nextStepPlan),
+          nextStepPlan,
         });
       } else {
         console.log(`\n${brandBanner()}`);
@@ -250,17 +258,7 @@ export async function runCli(args: string[]): Promise<number> {
           `  ${result.deployed ? statusTag("success") : statusTag("info")} Azure deployment ` +
             `${result.deployed ? "completed" : "not requested"}`,
         );
-        console.log(`\n${style.bold("Next step")} ${style.cyan("npm run dev")}`);
-        if (!result.deployed && result.environmentName) {
-          console.log(`\n${style.bold("When you are ready for Azure")}`);
-          console.log(
-            `  ${style.blue(">")} npx create-cosmos-agent prepare-azure . ` +
-              `--environment ${result.environmentName}`,
-          );
-          console.log(
-            `  ${style.blue(">")} azd up --environment ${result.environmentName}`,
-          );
-        }
+        printNextSteps(nextStepPlan);
       }
       return 0;
     }
@@ -273,16 +271,22 @@ export async function runCli(args: string[]): Promise<number> {
         console.log(`${statusTag("success")} Git repository initialized`);
       }
     }
+    const nextStepPlan = buildNextStepPlan(created, scenario, options);
     if (options.json) {
       writeJson({
         command: "create",
         status: "created",
         destination: created,
         template: scenario.id,
-        nextSteps: nextSteps(created, includeWeb),
+        preflight,
+        nextSteps: nextSteps(nextStepPlan),
+        nextStepPlan,
       });
     } else {
-      printNextSteps(created, includeWeb);
+      console.log(`\n${brandBanner()}`);
+      console.log(`\n${statusTag("success")} Created Cosmos Agent Starter`);
+      console.log(`  ${style.dim(created)}`);
+      printNextSteps(nextStepPlan);
     }
     return 0;
   } catch (error) {
